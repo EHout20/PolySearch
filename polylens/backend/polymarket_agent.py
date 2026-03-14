@@ -214,23 +214,27 @@ async def browser_research(query: str, market: dict, related: list[dict]) -> str
         extra_chromium_args=['--blink-settings=imagesEnabled=false']
     ))
 
-    unified_prompt = f"""You are a Master Betting Intelligence Agent.
-YOUR GOAL: Provide a deeply informative and contextual briefing for "{query}".
+    unified_prompt = f"""You are a research agent. Your ONLY goal is to find 5 real news articles about "{query}".
 
-1. WEB RESEARCH: Go to google.com and search for "{query} latest injuries standings news statistics".
-2. EXTRACTION: Find and extract:
-   - COMPREHENSIVE CONTEXT: Explain the league, event, or topic status. If sports, get records, seeds, and season storylines.
-   - PERSONNEL INTEL: List key figures (players/coaches/leaders) and their current status (injuries, form, scandals).
-   - RECENT NEWS: Find 5 high-quality news articles with titles, snippets, source names, and URLs.
-3. OUTPUT: Return ONLY a RAW JSON object. Be extremely detailed in the briefing and intel fields.
+STEPS (do them fast):
+1. Go to https://news.google.com/search?q={query.replace(' ', '+')}&hl=en-US
+2. For each of the top 5 article links on the page: click the link, wait for it to load, then copy the full browser URL (not a google.com URL).
+3. Also note: the article title, publication source name, and a 1-sentence summary.
+
+OUTPUT: Return ONLY this raw JSON with no markdown:
 {{
-  "briefing": "A long, detailed educational context about the terminology and entities (3-4 paragraphs).",
-  "intel": "A comprehensive list of facts found: Detailed injury reports, team stats, recent game results, or political poll data.",
+  "briefing": "2-paragraph summary of the current state of {query} based on what you found.",
+  "intel": "Key facts: key players, standings, injuries, or relevant stats.",
   "news": [
-    {{"source": "Actual Site Name", "age": "e.g. 2 hours ago", "headline": "Real headline", "snippet": "Detailed snippet of the article content.", "sentiment": "bull|bear|neutral", "url": "https://url.com"}},
-    ...
+    {{"source": "ESPN", "age": "2h ago", "headline": "Exact Article Title", "snippet": "One-sentence summary.", "sentiment": "neutral", "url": "https://espn.com/article-actual-url"}},
+    {{"source": "Reuters", "age": "5h ago", "headline": "Exact Article Title", "snippet": "One-sentence summary.", "sentiment": "neutral", "url": "https://reuters.com/article-actual-url"}},
+    {{"source": "BBC", "age": "1d ago", "headline": "Exact Article Title", "snippet": "One-sentence summary.", "sentiment": "neutral", "url": "https://bbc.com/article-actual-url"}},
+    {{"source": "AP News", "age": "2d ago", "headline": "Exact Article Title", "snippet": "One-sentence summary.", "sentiment": "neutral", "url": "https://apnews.com/article-actual-url"}},
+    {{"source": "Source", "age": "3d ago", "headline": "Exact Article Title", "snippet": "One-sentence summary.", "sentiment": "neutral", "url": "https://full-article-url-here.com"}}
   ]
-}}"""
+}}
+
+CRITICAL: The url field MUST be the direct article URL (starting with https://), NOT a google.com URL."""
 
     sys.stderr.write(f"\n🌐  Launching SILENT Multi-Agent Deep Research for: {query}\n")
     
@@ -242,7 +246,7 @@ YOUR GOAL: Provide a deeply informative and contextual briefing for "{query}".
     agent = Agent(task=unified_prompt, llm=llm, browser=browser, use_vision=False)
     
     try:
-        history = await agent.run(max_steps=15)
+        history = await agent.run(max_steps=8)
         raw_result = history.final_result() or "{}"
         
         # Clean potential markdown

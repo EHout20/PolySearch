@@ -172,6 +172,49 @@ Respond with a JSON object (no markdown, pure JSON):
   }
 }
 
+// ── Google News RSS Fetcher (no API key required) ────────────────────────────
+async function fetchGoogleNewsRss(query: string): Promise<any[]> {
+  try {
+    const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+    const res = await fetch(rssUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(6000)
+    });
+    const xml = await res.text();
+    // Parse items out of RSS XML without a library
+    const itemMatches = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)];
+    const news: any[] = [];
+    for (const match of itemMatches.slice(0, 8)) {
+      const block = match[1];
+      const title = (block.match(/<title><!\[CDATA\[(.+?)\]\]><\/title>/) || block.match(/<title>(.+?)<\/title>/))?.[1]?.trim();
+      const rawLink = (block.match(/<link>([^<]+)<\/link>/) || block.match(/<link\s*\/>\s*<([^>]+)>/))?.[1]?.trim();
+      const pubDate = (block.match(/<pubDate>(.+?)<\/pubDate>/))?.[1]?.trim();
+      const descRaw = (block.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/) || block.match(/<description>([\s\S]*?)<\/description>/))?.[1] || '';
+      // Strip HTML tags from description
+      const snippet = descRaw.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim().slice(0, 200);
+      // Extract the real source from title (Google News format: "Headline - Source")
+      const sourceSplit = title?.lastIndexOf(' - ');
+      const headline = sourceSplit && sourceSplit > 0 ? title?.slice(0, sourceSplit) : title;
+      const source = sourceSplit && sourceSplit > 0 ? title?.slice(sourceSplit + 3) : 'News';
+      // Google News links are redirects — use them directly, they forward to the article
+      const url = rawLink || '';
+      // Parse age from pubDate
+      let age = 'Recent';
+      if (pubDate) {
+        const diff = Date.now() - new Date(pubDate).getTime();
+        const h = Math.floor(diff / 3.6e6);
+        const d = Math.floor(diff / 8.64e7);
+        age = h < 24 ? `${h}h ago` : `${d}d ago`;
+      }
+      if (headline && url) news.push({ source, age, headline, snippet, url, sentiment: 'neutral' });
+    }
+    return news;
+  } catch (e) {
+    console.warn('News RSS fetch failed:', e);
+    return [];
+  }
+}
+
 // ── Main Handler ─────────────────────────────────────────────────────────────
 export async function POST(req: Request) {
   try {
@@ -256,11 +299,14 @@ export async function POST(req: Request) {
     // Build related markets
     const relatedMarkets = events.slice(1, 11).map(extractGammaMarket);
 
+    // Fetch real news from Google News RSS for fast scan
+    const news = await fetchGoogleNewsRss(market.title || query);
+
     return NextResponse.json({ 
       market, 
       summary, 
       factors, 
-      news: [], // Blank until deep research provides real ones
+      news,
       relatedMarkets 
     });
   } catch (error: any) {
