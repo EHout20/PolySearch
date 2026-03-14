@@ -175,11 +175,13 @@ export default function Home() {
         />
       )}
 
-      <MarketExplorer
-        title={isSearching ? 'Related Markets' : 'Trending Markets'}
-        data={isSearching ? relatedMarkets : trendingMarkets}
-        onSelect={(q) => handleSearch(q)}
-      />
+      {!researchData && (
+        <MarketExplorer
+          title={isSearching ? 'Related Markets' : 'Trending Markets'}
+          data={isSearching ? relatedMarkets : trendingMarkets}
+          onSelect={(q) => handleSearch(q)}
+        />
+      )}
 
       <footer style={{ marginTop: 80, padding: '24px 0 40px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--muted)' }}>
         <div>&copy; 2026 PolyLens Market Research</div>

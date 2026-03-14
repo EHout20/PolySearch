@@ -20,17 +20,16 @@ export default function MarketExplorer({ title, data, onSelect }: Props) {
       </div>
       
       <div className="card">
-        <div className="odds-row header">
+        <div className="odds-row header" style={{ gridTemplateColumns: '1fr 100px 100px' }}>
           <div className="odds-col">Market</div>
           <div className="odds-col center">Odds</div>
-          <div className="odds-col center">24h</div>
           <div className="odds-col right">Volume</div>
         </div>
         
         {displayData.map((m, i) => {
           const pColor = m.probability >= 60 ? 'var(--green)' : m.probability >= 35 ? 'var(--amber)' : 'var(--red)';
           return (
-            <div key={m.slug + i} className="odds-row" onClick={() => onSelect?.(m.title)}>
+            <div key={m.slug + i} className="odds-row" style={{ gridTemplateColumns: '1fr 100px 100px' }} onClick={() => onSelect?.(m.title)}>
               <div className="odds-col">
                 <div className="odds-m-title">{m.title}</div>
                 {m.isMulti && (
@@ -41,11 +40,6 @@ export default function MarketExplorer({ title, data, onSelect }: Props) {
               </div>
               <div className="odds-col center">
                 <div className="odds-prob" style={{ color: pColor }}>{m.probability}%</div>
-              </div>
-              <div className="odds-col center">
-                <div className={`odds-delta ${m.deltaDirection === 'up' ? 'up' : m.deltaDirection === 'down' ? 'down' : ''}`}>
-                  {m.delta24h}
-                </div>
               </div>
               <div className="odds-col right">
                 <div className="odds-vol">{m.volume}</div>

@@ -30,9 +30,9 @@ body {
 }
 
 .app-container {
-  max-width: 900px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 24px;
 }
 
 /* ── COMPONENTS ── */
@@ -76,7 +76,7 @@ body {
 .hero-sub {
   font-size: 18px;
   color: var(--muted);
-  max-width: 500px;
+  max-width: 600px;
   margin-bottom: 32px;
 }
 
