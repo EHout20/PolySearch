@@ -171,6 +171,7 @@ async def browser_research(query: str, market: dict, related: list[dict]) -> str
     """
     try:
         from browser_use import Agent, Browser
+        from browser_use.browser.browser import BrowserConfig
         # from browser_use.browser.session import BrowserSession as Browser # Alternative if needed
     except ImportError as e:
         return json.dumps({"error": f"browser-use not available: {e}"})
@@ -204,8 +205,7 @@ async def browser_research(query: str, market: dict, related: list[dict]) -> str
         return json.dumps({"error": "langchain-google-genai not installed"})
 
     # Configure browser to be truly headless (no tabs popping up)
-    # Configure browser - in 0.12.2 Browser defaults to headless or can be configured via Agent
-    browser = Browser()
+    browser = Browser(config=BrowserConfig(headless=True))
 
     unified_prompt = f"""You are a Master Betting Intelligence Agent.
 YOUR GOAL: Provide a deeply informative and contextual briefing for "{query}".
