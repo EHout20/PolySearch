@@ -189,8 +189,13 @@ export default function ResearchResults({ data, query, onDeepResearch, loadingDe
                   {isPrompt ? (
                     <div className="ai-summary-text" style={{ fontStyle: 'italic', color: 'var(--muted)', display: 'flex', flexDirection: 'column', gap: 12 }}>
                       <p>{summary}</p>
-                      <button className="search-btn" style={{ alignSelf: 'flex-start', fontSize: 12, padding: '8px 16px' }} onClick={onDeepResearch}>
-                        Generate Analysis →
+                      <button className="search-btn" style={{ alignSelf: 'flex-start', fontSize: 12, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 8 }} onClick={onDeepResearch} disabled={loadingDeep}>
+                        {loadingDeep ? (
+                          <>
+                            <span style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
+                            Running Deep Research...
+                          </>
+                        ) : 'Generate Analysis \u2192'}
                       </button>
                     </div>
                   ) : (
@@ -212,7 +217,24 @@ export default function ResearchResults({ data, query, onDeepResearch, loadingDe
           {/* MAIN INTEL GRID: Report vs News */}
           <div style={{ display: 'grid', gridTemplateColumns: data.report && news.length > 0 ? '1.2fr 0.8fr' : '1fr', gap: 24, marginBottom: 24 }}>
             {/* INTELLIGENCE REPORT */}
-            {data.report && (
+            {loadingDeep && !data.report ? (
+              <div className="card" style={{ borderLeft: '4px solid #2563eb' }}>
+                <div className="card-header">
+                  <div className="card-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    📋 Intelligence Report
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, color: '#2563eb', fontFamily: 'Geist Mono, monospace' }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', border: '1.5px solid #2563eb', borderTopColor: 'transparent', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
+                      Synthesizing…
+                    </span>
+                  </div>
+                </div>
+                <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {[100, 90, 95, 70].map((w, i) => (
+                    <div key={i} style={{ height: 13, borderRadius: 6, background: 'var(--surface2)', width: `${w}%`, animation: `shimmerPulse 1.6s ease-in-out ${i * 0.15}s infinite` }} />
+                  ))}
+                </div>
+              </div>
+            ) : data.report ? (
               <div className="card" style={{ borderLeft: '4px solid #2563eb' }}>
                 <div className="card-header">
                   <div className="card-label">📋 Intelligence Report</div>
@@ -232,10 +254,31 @@ export default function ResearchResults({ data, query, onDeepResearch, loadingDe
                   </div>
                 </div>
               </div>
-            )}
+            ) : null}
 
             {/* NEWS ARTICLES (Side-by-side with Report if exists) */}
-            {news.length > 0 ? (
+            {loadingDeep && news.length === 0 ? (
+              <div className="card">
+                <div className="card-header">
+                  <div className="card-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    📰 News & Sources
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, color: '#2563eb', fontFamily: 'Geist Mono, monospace' }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', border: '1.5px solid #2563eb', borderTopColor: 'transparent', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
+                      Gathering sources…
+                    </span>
+                  </div>
+                </div>
+                <div style={{ padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {[1, 2, 3].map(i => (
+                    <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ height: 10, borderRadius: 5, background: 'var(--surface2)', width: '35%', animation: `shimmerPulse 1.6s ease-in-out ${i * 0.2}s infinite` }} />
+                      <div style={{ height: 13, borderRadius: 5, background: 'var(--surface2)', width: '90%', animation: `shimmerPulse 1.6s ease-in-out ${i * 0.2 + 0.1}s infinite` }} />
+                      <div style={{ height: 11, borderRadius: 5, background: 'var(--surface2)', width: '75%', animation: `shimmerPulse 1.6s ease-in-out ${i * 0.2 + 0.2}s infinite` }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : news.length > 0 ? (
               <div className="card">
                 <div className="card-header">
                   <div className="card-label">📰 News & Sources</div>
