@@ -92,7 +92,8 @@ def extract_market(event: dict) -> dict:
         "outcomes": outcomes,
         "outcomePrices": prices,
         "description": event.get("description", ""),
-        "isMulti": is_multi
+        "isMulti": is_multi,
+        "eventId": event.get("id")
     }
 
 
@@ -141,15 +142,36 @@ def fetch_gamma(query: str) -> tuple[dict, list[dict], bool]:
         return default_market, [], False
 
 
-# ── Step 2: browser-use web research (Consolidated Call) ─────────────────────
+# ── Step 2: Fetch Comments ────────────────────────────────────────────────────
+def fetch_comments(event_id: str | int) -> list[str]:
+    """Fetch recent comments for the event."""
+    if not event_id: return []
+    params = urlencode({
+        "parent_entity_id": str(event_id),
+        "parent_entity_type": "Event",
+        "limit": "20",
+        "order": "createdAt",
+        "ascending": "false"
+    })
+    try:
+        data = gamma_get(f"/comments?{params}")
+        if isinstance(data, list):
+            return [c.get("content", "") for c in data if c.get("content")]
+        return []
+    except Exception as e:
+        sys.stderr.write(f"[Comments API error] {e}\n")
+        return []
+
+
+# ── Step 3: browser-use web research (Consolidated Call) ─────────────────────
 async def browser_research(query: str, market: dict, related: list[dict]) -> str:
     """
     Use browser-use + Gemini to find recent web content and generate the ANALYST BRIEF in one go.
     This saves 50% on LLM calls to avoid 429 limits.
     """
     try:
-        from browser_use import Agent, Browser, BrowserConfig
-        from langchain_google_genai import ChatGoogleGenerativeAI
+        from browser_use import Agent, Browser
+        # from browser_use.browser.session import BrowserSession as Browser # Alternative if needed
     except ImportError as e:
         return json.dumps({"error": f"browser-use not available: {e}"})
 
@@ -182,32 +204,43 @@ async def browser_research(query: str, market: dict, related: list[dict]) -> str
         return json.dumps({"error": "langchain-google-genai not installed"})
 
     # Configure browser to be truly headless (no tabs popping up)
-    browser = Browser(config=BrowserConfig(headless=True))
+    # Configure browser - in 0.12.2 Browser defaults to headless or can be configured via Agent
+    browser = Browser()
 
-    edu_prompt = f"""You are an Educational Research Agent.
-YOUR GOAL: Explain "{query}" to a complete beginner.
-Research the terminology, the entities involved (e.g., specific sports leagues, agencies, political bodies), and the current context.
-For example, if the query includes "La Liga", explain what La Liga is and who the teams are. 
-Return a clear, concise 2-3 paragraph summary focusing on the basics. Do not use JSON."""
+    edu_prompt = f"""You are an Intelligence Research Agent.
+YOUR GOAL: Provide a deep contextual briefing for "{query}".
+1. Explain the core terminology and entities involved (e.g., leagues like NBA/NFL, specific agencies, political bodies).
+2. FIND CURRENT CONTEXT: If this is sports, find the current standings, rankings, and major season storylines. If political, find the current legislative status or polling trends.
+3. IDENTIFY KEY PERSONNEL: List the most important players, leaders, or figures relevant to this specific query.
+Return a clear, concise briefing focusing on facts. Do not use JSON."""
 
-    scrape_prompt = f"""You are a News Scraping Agent.
-YOUR GOAL: Find 5 RECENT and DIVERSE news articles about "{query}".
-1. Go to google.com/news.
-2. Search for "{query} latest news predictions".
-3. Open at least 5 DIFFERENT organic results from VARIOUS publishers (e.g., ESPN, BBC, Reuters, specialized blogs).
-4. Do NOT use "Polymarket" or "Google Search" as your sources. Find actual news sites.
-5. From each result, extract the page title, the REAL source name, and the EXACT URL.
+    scrape_prompt = f"""You are a News & Intel Scraping Agent.
+YOUR GOAL: Find 5 RECENT news articles AND specific contextual data about "{query}".
+1. Go to google.com.
+2. Search for "{query} latest injuries standings news".
+3. Find and extract:
+   - Recent news headlines and snippets.
+   - Specific "Intel": Player injuries, team standings, recent game results, or key upcoming events.
+4. Open at least 5 DIFFERENT results.
+5. Extract page title, source, URL, and the specific intel found.
 6. Close all tabs when finished.
 
-CRITICAL: Return ONLY a RAW JSON object. Do NOT use placeholders like "Site Name".
+CRITICAL: Return ONLY a RAW JSON object.
 {{
   "news": [
-    {{"source": "Actual Site Name", "age": "e.g. 2 hours ago", "headline": "The real headline", "snippet": "A meaningful summary snippet.", "sentiment": "bull|bear|neutral", "url": "https://full-unique-url.com"}},
+    {{"source": "Actual Site Name", "age": "e.g. 2 hours ago", "headline": "Real headline", "snippet": "Contextual snippet.", "sentiment": "bull|bear|neutral", "url": "https://url.com"}},
     ...
-  ]
+  ],
+  "intel": "Specific facts found (e.g. 'LeBron is out with ankle injury', 'Celtics are 1st in East')"
 }}"""
 
     print(f"\n🌐  Launching SILENT Multi-Agent Deep Research for: {query}\n")
+    
+    # NEW: Fetch comments from Gamma
+    event_id = market.get("eventId")
+    comments_list = fetch_comments(event_id) if event_id else []
+    comments_block = "\n".join([f"- {c}" for c in comments_list[:10]]) if comments_list else "No recent community comments found."
+
     agent_edu = Agent(task=edu_prompt, llm=llm, browser=browser, use_vision=False)
     agent_scrape = Agent(task=scrape_prompt, llm=llm, browser=browser, use_vision=False)
     
@@ -241,33 +274,38 @@ CRITICAL: Return ONLY a RAW JSON object. Do NOT use placeholders like "Site Name
 
             # Final Synthesis
             synthesize_prompt = f"""You are a Betting Analysis Expert.
-Combine the following research into a final analysis for "{query}".
+Combine the following research into a final intelligence report for "{query}".
 
-EDUCATIONAL CONTEXT (for beginners):
+EDUCATIONAL & CONTEXTUAL INTEL:
 {edu_text}
 
-NEWS AND ARTICLES (JSON):
+NEWS AND SCRAPED INTEL (JSON):
 {scrape_json}
+
+POLYMARKET COMMUNITY COMMENTS:
+{comments_block}
 
 CURRENT MARKET ODDS (Probability): {prob}%
 
 YOUR TASK:
-1. Synthesize a "summary" that explains the event simply (using the Educator's context) and analyzes current trends.
-2. List prominent "factors" (bullet points) affecting the outcome.
-3. Clean and return the list of 5 news articles.
+1. Write a "summary": 2-3 sentences max.
+2. Write a "report": A high-value, structured intelligence briefing. 
+   - Sections: # CURRENT STATUS (Standings/Rankings), # PERSONNEL & INJURIES, # COMMUNITY SENTIMENT (Analyze those comments!), # MARKET ANALYSIS.
+   - Be specific and data-driven.
+3. List 3-4 prominent "factors" (bullet points).
+4. Clean and return the list of 5 news articles.
 
 RETURN ONLY A RAW JSON OBJECT:
 {{
-  "summary": "Full analysis here...",
+  "summary": "Quick snippet...",
+  "report": "Full structured report here...",
   "factors": [
-    {{"direction": "up|down|neutral", "title": "Factor title", "detail": "Detailed explanation"}},
-    {{"direction": "up|down|neutral", "title": "Factor title", "detail": "Detailed explanation"}},
-    {{"direction": "up|down|neutral", "title": "Factor title", "detail": "Detailed explanation"}}
+    {{"direction": "up|down|neutral", "title": "Factor title", "detail": "Detail"}}
   ],
   "news": [ ...at least 5 real news items... ],
   "sentiment": {{"bull": 50, "bear": 30, "neutral": 20}},
-  "probabilityLabel": "Analysis Outcome",
-  "signals": [{{ "label": "Social Trend", "type": "info" }}]
+  "probabilityLabel": "Market Verdict",
+  "signals": [{{ "label": "Hot News", "type": "info" }}]
 }}"""
             
             final_response = await llm.ainvoke(synthesize_prompt)
@@ -307,8 +345,9 @@ USER QUERY: "{query}"
 
 Return ONLY a valid JSON object (no markdown) with these exact fields:
 {{
-  "probabilityLabel": "e.g. Moderate-high probability",
-  "summary": "2-3 sentence sharp analyst commentary grounded in real context.",
+  "probabilityLabel": "Market Verdict",
+  "summary": "Quick high-level snippet.",
+  "report": "Brief data-driven report mentioning current context and trends.",
   "signals": [{{ "label": "...", "type": "bull|bear|neutral|watch|info" }}, ...],
   "factors": [{{ "direction": "up|down|neutral", "title": "...", "detail": "..." }}, ...],
   "news": [{{ "source": "...", "age": "...", "headline": "...", "snippet": "...", "sentiment": "positive|neutral|negative" }}, ...],
