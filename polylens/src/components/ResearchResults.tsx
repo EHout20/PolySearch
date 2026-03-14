@@ -185,35 +185,86 @@ export default function ResearchResults({ data, query, onDeepResearch, loadingDe
                   </button>
                 </div>
               ) : (
-                <div className="ai-summary-text">{data.summary || 'AI summary loading…'}</div>
+                <div className="ai-summary-text" style={{ whiteSpace: 'pre-wrap' }}>{data.summary || 'AI summary loading…'}</div>
               )}
             </div>
           </div>
 
-          {/* INTELLIGENCE REPORT */}
-          {data.report && (
-            <div className="card" style={{ marginBottom: 24, borderLeft: '4px solid #2563eb' }}>
-              <div className="card-header">
-                <div className="card-label">📋 Intelligence Report</div>
-                <div className="card-label" style={{ color: '#2563eb', fontSize: 10 }}>Comprehensive Briefing</div>
-              </div>
-              <div className="card-body" style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text)' }}>
-                <div className="report-content" style={{ whiteSpace: 'pre-wrap' }}>
-                  {data.report.split('\n').map((line, i) => {
-                    if (line.startsWith('# ')) {
-                      return <h3 key={i} style={{ fontSize: 16, fontWeight: 700, marginTop: 16, marginBottom: 8, color: '#111827' }}>{line.replace('# ', '')}</h3>;
-                    }
-                    if (line.startsWith('## ')) {
-                      return <h4 key={i} style={{ fontSize: 14, fontWeight: 700, marginTop: 12, marginBottom: 6, color: '#374151' }}>{line.replace('## ', '')}</h4>;
-                    }
-                    return <p key={i} style={{ marginBottom: 12 }}>{line}</p>;
-                  })}
+          {/* MAIN INTEL GRID: Report vs News */}
+          <div style={{ display: 'grid', gridTemplateColumns: data.report && news.length > 0 ? '1.2fr 0.8fr' : '1fr', gap: 24, marginBottom: 24 }}>
+            {/* INTELLIGENCE REPORT */}
+            {data.report && (
+              <div className="card" style={{ borderLeft: '4px solid #2563eb' }}>
+                <div className="card-header">
+                  <div className="card-label">📋 Intelligence Report</div>
+                  <div className="card-label" style={{ color: '#2563eb', fontSize: 10 }}>Comprehensive Briefing</div>
+                </div>
+                <div className="card-body" style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text)' }}>
+                  <div className="report-content" style={{ whiteSpace: 'pre-wrap' }}>
+                    {data.report.split('\n').map((line, i) => {
+                      if (line.startsWith('# ')) {
+                        return <h3 key={i} style={{ fontSize: 16, fontWeight: 700, marginTop: 16, marginBottom: 8, color: '#111827' }}>{line.replace('# ', '')}</h3>;
+                      }
+                      if (line.startsWith('## ')) {
+                        return <h4 key={i} style={{ fontSize: 14, fontWeight: 700, marginTop: 12, marginBottom: 6, color: '#374151' }}>{line.replace('## ', '')}</h4>;
+                      }
+                      return <p key={i} style={{ marginBottom: 12 }}>{line}</p>;
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* DEEP RESEARCH PANEL */}
+            {/* NEWS ARTICLES (Side-by-side with Report if exists) */}
+            {news.length > 0 && (
+              <div className="card">
+                <div className="card-header">
+                  <div className="card-label">📰 News & Sources</div>
+                  <div className="card-label" style={{ color: 'var(--muted)' }}>{news.length} articles</div>
+                </div>
+                <div style={{ padding: '8px 0', maxHeight: 800, overflowY: 'auto' }}>
+                  {visibleNews.map((n, i) => {
+                    const s = n.sentiment as 'bull' | 'bear' | 'neutral';
+                    const articleUrl = n.url || `https://news.google.com/search?q=${encodeURIComponent(n.headline)}&hl=en`;
+                    return (
+                      <a key={i} href={articleUrl} target="_blank" rel="noopener noreferrer"
+                        style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
+                        <div
+                          style={{ padding: '14px 20px', borderBottom: i < visibleNews.length - 1 ? '1px solid var(--border)' : 'none', transition: 'background 0.15s' }}
+                          onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface2)')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontFamily: 'Geist Mono, monospace', fontSize: 10, textTransform: 'uppercase', color: 'var(--muted)' }}>{n.source}</span>
+                              <span style={{ fontSize: 10, color: 'var(--muted)' }}>· {n.age}</span>
+                            </div>
+                            <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, color: SENT_COLOR[s] || 'var(--muted)', background: SENT_BG[s] || 'transparent', fontFamily: 'Geist Mono, monospace' }}>
+                              {SENT_LABEL[s] || '◎ Neutral'}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, lineHeight: 1.3 }}>
+                            {n.headline}
+                            <span style={{ marginLeft: 6, fontSize: 11, color: '#2563eb' }}>↗</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4 }}>{n.snippet}</div>
+                        </div>
+                      </a>
+                    );
+                  })}
+                </div>
+                {news.length > 5 && (
+                  <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)' }}>
+                    <button className="show-more-btn" style={{ marginTop: 0 }} onClick={() => setNewsExpanded(!newsExpanded)}>
+                      {newsExpanded ? 'Show Less ↑' : `Show ${news.length - 5} More Articles ↓`}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* DEEP RESEARCH PANEL (Below the main grid) */}
           <div className="card" style={{ marginBottom: 24, border: loadingDeep ? '1px solid #2563eb' : '1px solid var(--border)' }}>
             <div className="card-header" style={{ background: loadingDeep ? 'rgba(37,99,235,0.04)' : 'transparent' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -261,54 +312,6 @@ export default function ResearchResults({ data, query, onDeepResearch, loadingDe
               )}
             </div>
           </div>
-
-          {/* NEWS ARTICLES */}
-          {news.length > 0 && (
-            <div className="card">
-              <div className="card-header">
-                <div className="card-label">📰 News & Sources</div>
-                <div className="card-label" style={{ color: 'var(--muted)' }}>{news.length} articles</div>
-              </div>
-              <div style={{ padding: '8px 0' }}>
-                {visibleNews.map((n, i) => {
-                  const s = n.sentiment as 'bull' | 'bear' | 'neutral';
-                  const articleUrl = n.url || `https://news.google.com/search?q=${encodeURIComponent(n.headline)}&hl=en`;
-                  return (
-                    <a key={i} href={articleUrl} target="_blank" rel="noopener noreferrer"
-                      style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
-                      <div
-                        style={{ padding: '14px 20px', borderBottom: i < visibleNews.length - 1 ? '1px solid var(--border)' : 'none', transition: 'background 0.15s' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface2)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontFamily: 'Geist Mono, monospace', fontSize: 10, textTransform: 'uppercase', color: 'var(--muted)' }}>{n.source}</span>
-                            <span style={{ fontSize: 10, color: 'var(--muted)' }}>· {n.age}</span>
-                          </div>
-                          <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, color: SENT_COLOR[s] || 'var(--muted)', background: SENT_BG[s] || 'transparent', fontFamily: 'Geist Mono, monospace' }}>
-                            {SENT_LABEL[s] || '◎ Neutral'}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4, lineHeight: 1.4 }}>
-                          {n.headline}
-                          <span style={{ marginLeft: 6, fontSize: 11, color: '#2563eb' }}>↗</span>
-                        </div>
-                        <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>{n.snippet}</div>
-                      </div>
-                    </a>
-                  );
-                })}
-              </div>
-              {news.length > 5 && (
-                <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)' }}>
-                  <button className="show-more-btn" style={{ marginTop: 0 }} onClick={() => setNewsExpanded(!newsExpanded)}>
-                    {newsExpanded ? 'Show Less ↑' : `Show ${news.length - 5} More Articles ↓`}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         {/* ─── RIGHT COLUMN ─────────────────────────────────── */}

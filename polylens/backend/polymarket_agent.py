@@ -207,31 +207,22 @@ async def browser_research(query: str, market: dict, related: list[dict]) -> str
     # Configure browser - in 0.12.2 Browser defaults to headless or can be configured via Agent
     browser = Browser()
 
-    edu_prompt = f"""You are an Intelligence Research Agent.
-YOUR GOAL: Provide a deep contextual briefing for "{query}".
-1. Explain the core terminology and entities involved (e.g., leagues like NBA/NFL, specific agencies, political bodies).
-2. FIND CURRENT CONTEXT: If this is sports, find the current standings, rankings, and major season storylines. If political, find the current legislative status or polling trends.
-3. IDENTIFY KEY PERSONNEL: List the most important players, leaders, or figures relevant to this specific query.
-Return a clear, concise briefing focusing on facts. Do not use JSON."""
+    unified_prompt = f"""You are a Master Betting Intelligence Agent.
+YOUR GOAL: Provide a deeply informative and contextual briefing for "{query}".
 
-    scrape_prompt = f"""You are a News & Intel Scraping Agent.
-YOUR GOAL: Find 5 RECENT news articles AND specific contextual data about "{query}".
-1. Go to google.com.
-2. Search for "{query} latest injuries standings news".
-3. Find and extract:
-   - Recent news headlines and snippets.
-   - Specific "Intel": Player injuries, team standings, recent game results, or key upcoming events.
-4. Open at least 5 DIFFERENT results.
-5. Extract page title, source, URL, and the specific intel found.
-6. Close all tabs when finished.
-
-CRITICAL: Return ONLY a RAW JSON object.
+1. WEB RESEARCH: Go to google.com and search for "{query} latest injuries standings news statistics".
+2. EXTRACTION: Find and extract:
+   - COMPREHENSIVE CONTEXT: Explain the league, event, or topic status. If sports, get records, seeds, and season storylines.
+   - PERSONNEL INTEL: List key figures (players/coaches/leaders) and their current status (injuries, form, scandals).
+   - RECENT NEWS: Find 5 high-quality news articles with titles, snippets, source names, and URLs.
+3. OUTPUT: Return ONLY a RAW JSON object. Be extremely detailed in the briefing and intel fields.
 {{
+  "briefing": "A long, detailed educational context about the terminology and entities (3-4 paragraphs).",
+  "intel": "A comprehensive list of facts found: Detailed injury reports, team stats, recent game results, or political poll data.",
   "news": [
-    {{"source": "Actual Site Name", "age": "e.g. 2 hours ago", "headline": "Real headline", "snippet": "Contextual snippet.", "sentiment": "bull|bear|neutral", "url": "https://url.com"}},
+    {{"source": "Actual Site Name", "age": "e.g. 2 hours ago", "headline": "Real headline", "snippet": "Detailed snippet of the article content.", "sentiment": "bull|bear|neutral", "url": "https://url.com"}},
     ...
-  ],
-  "intel": "Specific facts found (e.g. 'LeBron is out with ankle injury', 'Celtics are 1st in East')"
+  ]
 }}"""
 
     print(f"\n🌐  Launching SILENT Multi-Agent Deep Research for: {query}\n")
@@ -241,84 +232,88 @@ CRITICAL: Return ONLY a RAW JSON object.
     comments_list = fetch_comments(event_id) if event_id else []
     comments_block = "\n".join([f"- {c}" for c in comments_list[:10]]) if comments_list else "No recent community comments found."
 
-    agent_edu = Agent(task=edu_prompt, llm=llm, browser=browser, use_vision=False)
-    agent_scrape = Agent(task=scrape_prompt, llm=llm, browser=browser, use_vision=False)
+    agent = Agent(task=unified_prompt, llm=llm, browser=browser, use_vision=False)
     
     try:
-        results = await asyncio.gather(
-            agent_edu.run(max_steps=15),
-            agent_scrape.run(max_steps=20),
-            return_exceptions=True
-        )
+        history = await agent.run(max_steps=15)
+        raw_result = history.final_result() or "{}"
         
-        # Consolidate results
-        edu_text = ""
-        scrape_json = "{}"
-        
-        if results and len(results) >= 2:
-            edu_raw = results[0]
-            scrape_raw = results[1]
-            
-            # educator returns raw text
-            if not isinstance(edu_raw, Exception):
-                edu_text = getattr(edu_raw, 'final_result', lambda: str(edu_raw))()
-            
-            # scraper returns JSON string
-            if not isinstance(scrape_raw, Exception):
-                scrape_json = getattr(scrape_raw, 'final_result', lambda: "{}")()
-            
-            # Determine probability for context
-            prob = 50
-            if isinstance(market, dict):
-                prob = market.get('probability', 50)
+        # Clean potential markdown
+        cleaned_json = raw_result.replace("```json", "").replace("```", "").strip()
+        data = {}
+        try:
+            data = json.loads(cleaned_json)
+        except:
+            data = {"briefing": cleaned_json, "intel": "Data extraction failed", "news": []}
 
-            # Final Synthesis
-            synthesize_prompt = f"""You are a Betting Analysis Expert.
-Combine the following research into a final intelligence report for "{query}".
+        edu_text = data.get("briefing", "No briefing found.")
+        news_list = data.get("news", [])
+        scraped_intel = data.get("intel", "")
 
-EDUCATIONAL & CONTEXTUAL INTEL:
+        # Determine probability for context
+        prob = 50
+        if isinstance(market, dict):
+            prob = market.get('probability', 50)
+
+        # Final Synthesis
+        synthesize_prompt = f"""You are a Professional Market Analyst & Intelligence Officer.
+YOUR GOAL: Produce a high-stakes, comprehensive intelligence briefing for "{query}".
+
+CONTEXTUAL INTEL:
 {edu_text}
 
-NEWS AND SCRAPED INTEL (JSON):
-{scrape_json}
+WEBSITE SCRAPED INTEL:
+{scraped_intel}
 
-POLYMARKET COMMUNITY COMMENTS:
+RECENT NEWS ARTICLES:
+{json.dumps(news_list)}
+
+POLYMARKET COMMUNITY DISCUSSION:
 {comments_block}
 
 CURRENT MARKET ODDS (Probability): {prob}%
 
 YOUR TASK:
-1. Write a "summary": 2-3 sentences max.
-2. Write a "report": A high-value, structured intelligence briefing. 
-   - Sections: # CURRENT STATUS (Standings/Rankings), # PERSONNEL & INJURIES, # COMMUNITY SENTIMENT (Analyze those comments!), # MARKET ANALYSIS.
-   - Be specific and data-driven.
-3. List 3-4 prominent "factors" (bullet points).
-4. Clean and return the list of 5 news articles.
+1. Write a "summary": 2-3 compelling paragraphs that synthesize the research into a coherent betting thesis.
+2. Write a "report": A professional-grade, structured intelligence dossier using Markdown headers.
+   - Use # for main sections and ## for sub-sections.
+   - SECTIONS REQUIRED:
+     # CURRENT STATUS
+     (Detail the standings, rankings, and major league/event storylines)
+     # PERSONNEL & INJURIES
+     (Provide a deep dive into key figures and their physical/mental status)
+     # COMMUNITY PULSE
+     (Analyze the community comments provided above. What is the sentiment? Are there contrarian views?)
+     # MARKET VERDICT
+     (Detailed analysis of why the odds are what they are and what shifts they may take)
+3. List 4 high-impact "factors" (bullet points).
+4. Return a "news" array with 5 real news items.
+
+CRITICAL: The "report" must be extremely detailed (at least 500 words). Use bolding and lists for readability.
 
 RETURN ONLY A RAW JSON OBJECT:
 {{
-  "summary": "Quick snippet...",
-  "report": "Full structured report here...",
-  "factors": [
-    {{"direction": "up|down|neutral", "title": "Factor title", "detail": "Detail"}}
-  ],
-  "news": [ ...at least 5 real news items... ],
-  "sentiment": {{"bull": 50, "bear": 30, "neutral": 20}},
-  "probabilityLabel": "Market Verdict",
-  "signals": [{{ "label": "Hot News", "type": "info" }}]
+  "summary": "Full summary text...",
+  "report": "Full dossier text...",
+  "factors": [ ... ],
+  "news": [ ... ],
+  "sentiment": {{"bull": x, "bear": y, "neutral": z}},
+  "probabilityLabel": "Market Label",
+  "signals": [{{ "label": "Label", "type": "warning|info|success" }}]
 }}"""
-            
-            final_response = await llm.ainvoke(synthesize_prompt)
-            return getattr(final_response, 'content', str(final_response))
-        else:
-            return json.dumps({"error": "Failed to gather multi-agent results"})
+        
+        final_response = await llm.ainvoke(synthesize_prompt)
+        # Ensure the response is returned as a string (it's already a JSON string from the LLM usually)
+        return getattr(final_response, 'content', str(final_response))
             
     except Exception as e:
-        # If both agents failed, return a basic market summary instead of just erroring
-        print(f"❌ Error in multi-agent research: {str(e)}")
+        # Generate a high-quality fallback
+        print(f"❌ Error in deep research: {str(e)}")
         fallback = {
-            "summary": f"Polymarket data for {query} is available, but deep web research encountered a technical issue. Implied probability: {market.get('probability', 50)}%.",
-            "factors": [], "news": [],
+            "summary": f"Polymarket data for {query} is available, but deep research encountered an issue. Implied probability: {market.get('probability', 50)}%.",
+            "report": "Intelligence report unavailable due to a technical error. Please try again later.",
+            "factors": [], 
+            "news": [],
             "sentiment": {"bull": 50, "bear": 30, "neutral": 20},
             "probabilityLabel": "Market Data Only"
         }

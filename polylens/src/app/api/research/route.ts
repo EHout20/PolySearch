@@ -85,7 +85,7 @@ async function getGeminiSummary(market: any, query: string): Promise<{ summary: 
     try {
       const fs = require('fs');
       const p = require('path');
-      const envPath = p.join(process.cwd(), '..', '.env');
+      const envPath = p.join(process.cwd(), '.env');
       if (fs.existsSync(envPath)) {
         const envFile = fs.readFileSync(envPath, 'utf8');
         const match = envFile.match(/^GOOGLE_API_KEY\s*=\s*(.+)$/m);
@@ -172,7 +172,7 @@ export async function POST(req: Request) {
 
     if (deep) {
       // Deep: run the Python agent
-      const scriptPath = path.join(process.cwd(), '..', 'polymarket_agent.py');
+      const scriptPath = path.join(process.cwd(), 'backend', 'polymarket_agent.py');
       let stdout = '', stderr = '';
       const agentProcess = spawn('python3', [scriptPath, query, '--json', '--deep']);
       agentProcess.stdout.on('data', (d) => { stdout += d.toString(); });
