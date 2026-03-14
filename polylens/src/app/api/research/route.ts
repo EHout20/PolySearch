@@ -91,16 +91,6 @@ async function getGeminiDeepSummary(
 ): Promise<{ summary: string; report: string; factors: any[]; signals: any[]; sentiment: any }> {
   let apiKey = process.env.GOOGLE_API_KEY;
   if (!apiKey) {
-    try {
-      const fs = require('fs');
-      const p = require('path');
-      const envPath = p.join(process.cwd(), '.env');
-      if (fs.existsSync(envPath)) {
-        const envFile = fs.readFileSync(envPath, 'utf8');
-        const match = envFile.match(/^GOOGLE_API_KEY\s*=\s*(.+)$/m);
-        if (match) apiKey = match[1].trim();
-      }
-    } catch (_) {}
   }
 
   if (!apiKey) return {
@@ -191,16 +181,6 @@ async function getGeminiSummary(market: any, query: string): Promise<{ summary: 
   let apiKey = process.env.GOOGLE_API_KEY;
   
   if (!apiKey) {
-    try {
-      const fs = require('fs');
-      const p = require('path');
-      const envPath = p.join(process.cwd(), '.env');
-      if (fs.existsSync(envPath)) {
-        const envFile = fs.readFileSync(envPath, 'utf8');
-        const match = envFile.match(/^GOOGLE_API_KEY\s*=\s*(.+)$/m);
-        if (match) apiKey = match[1].trim();
-      }
-    } catch (_) {}
   }
 
   if (!apiKey) return { 
