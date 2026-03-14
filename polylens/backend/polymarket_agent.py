@@ -240,7 +240,7 @@ CRITICAL: The url field MUST be the direct article URL (starting with https://),
     
     # NEW: Fetch comments from Gamma
     event_id = market.get("eventId")
-    comments_list = fetch_comments(event_id) if event_id else []
+    comments_list: list[str] = fetch_comments(event_id) if event_id else []
     comments_block = "\n".join([f"- {c}" for c in comments_list[:10]]) if comments_list else "No recent community comments found."
 
     agent = Agent(task=unified_prompt, llm=llm, browser=browser, use_vision=False)
