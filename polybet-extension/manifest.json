@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "PolyBet Tracker",
+  "version": "1.0",
+  "description": "Search and track your Polymarket bets and portfolio live from your side panel.",
+  "permissions": [
+    "sidePanel",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://*.polymarket.com/*",
+    "https://*.poymarket.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "Open PolyBet Tracker"
+  }
+}

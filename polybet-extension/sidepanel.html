@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PolyBet Tracker</title>
+  <link rel="stylesheet" href="sidepanel.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <div class="logo-section">
+        <div class="logo">🦞</div>
+        <h1>PolyBet <span>Tracker</span></h1>
+      </div>
+      <p class="subtitle">Live Predictions & Portfolio</p>
+    </header>
+
+    <div class="input-section">
+      <div class="search-container">
+        <input type="text" id="wallet-address" placeholder="Enter Wallet Address (0x...)" spellcheck="false">
+        <button id="fetch-btn">Load Bets</button>
+      </div>
+      <div id="loading-spinner" class="hidden">
+        <div class="spinner"></div>
+      </div>
+    </div>
+
+    <div class="stats-overview hidden" id="stats-overview">
+      <div class="stat-card">
+        <span class="label">Total Invested</span>
+        <span class="value" id="total-invested">$0.00</span>
+      </div>
+      <div class="stat-card">
+        <span class="label">P/L</span>
+        <span class="value" id="total-pl">$0.00</span>
+      </div>
+    </div>
+
+    <div class="search-section">
+      <input type="text" id="bet-search" placeholder="Search your bets..." class="hidden">
+    </div>
+
+    <main id="bet-list-container">
+      <div class="empty-state">
+        <div class="empty-icon">📈</div>
+        <p>Enter your wallet address above to see your active bets on Polymarket.</p>
+      </div>
+    </main>
+
+    <footer>
+      <div class="status-indicator">
+        <span class="dot green"></span> Connected to PolyData
+      </div>
+    </footer>
+  </div>
+  <script src="sidepanel.js"></script>
+</body>
+</html>

@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Polymarket Research</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@300;400;500&family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f5f2ec;
+  --surface: #ffffff;
+  --surface2: #f0ede6;
+  --border: #e2ddd4;
+  --border2: #ccc7bc;
+  --text: #1a1814;
+  --muted: #8a8577;
+  --accent: #1a1814;
+  --green: #1a6b4a;
+  --green-bg: #e8f5ef;
+  --red: #b03a2e;
+  --red-bg: #fbeae8;
+  --amber: #92600a;
+  --amber-bg: #fef3e2;
+  --blue: #1a3a6b;
+  --blue-bg: #e8eef5;
+}
+
+body {
+  font-family: 'Geist', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ── GRAIN OVERLAY ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0.6;
+}
+
+/* ── LAYOUT ── */
+.app { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+/* ── HEADER ── */
+header {
+  padding: 40px 0 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 20px;
+  margin-bottom: 48px;
+}
+
+.wordmark {
+  font-family: 'Instrument Serif', serif;
+  font-size: 22px;
+  color: var(--text);
+  letter-spacing: -0.3px;
+}
+.wordmark em { font-style: italic; color: var(--muted); }
+
+.header-tag {
+  font-family: 'Geist Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+}
+
+/* ── HERO / SEARCH ── */
+.hero {
+  margin-bottom: 56px;
+  transition: margin 0.4s ease;
+}
+.hero.compact { margin-bottom: 32px; }
+
+.hero-eyebrow {
+  font-family: 'Geist Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 16px;
+}
+
+.hero-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(36px, 6vw, 64px);
+  line-height: 1.05;
+  letter-spacing: -1px;
+  margin-bottom: 10px;
+  color: var(--text);
+}
+.hero-title em { font-style: italic; color: var(--muted); }
+
+.hero-sub {
+  font-size: 15px;
+  color: var(--muted);
+  margin-bottom: 36px;
+  font-weight: 300;
+}
+
+.search-wrap {
+  display: flex;
+  gap: 0;
+  background: var(--surface);
+  border: 1.5px solid var(--border2);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+.search-wrap:focus-within {
+  border-color: var(--text);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+#query {
+  flex: 1;
+  padding: 18px 20px;
+  font-family: 'Geist', sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+}
+#query::placeholder { color: var(--muted); }
+
+.search-btn {
+  padding: 14px 24px;
+  margin: 6px;
+  background: var(--text);
+  color: var(--bg);
+  border: none;
+  border-radius: 10px;
+  font-family: 'Geist', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s, transform 0.1s;
+  letter-spacing: 0.2px;
+}
+.search-btn:hover { opacity: 0.85; }
+.search-btn:active { transform: scale(0.98); }
+.search-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.example-queries {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.eq-label {
+  font-size: 12px;
+  color: var(--muted);
+  align-self: center;
+  margin-right: 4px;
+}
+.eq-pill {
+  font-size: 12px;
+  padding: 5px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  cursor: pointer;
+  color: var(--muted);
+  transition: all 0.15s;
+  font-family: 'Geist', sans-serif;
+}
+.eq-pill:hover {
+  border-color: var(--border2);
+  color: var(--text);
+  background: var(--surface2);
+}
+
+/* ── RESULTS ── */
+#results { display: none; }
+#results.show { display: block; animation: fadeUp 0.4s ease both; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.results-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.results-query {
+  font-family: 'Instrument Serif', serif;
+  font-size: 22px;
+  color: var(--text);
+  letter-spacing: -0.3px;
+  max-width: 600px;
+  line-height: 1.3;
+}
+
+.results-meta {
+  font-family: 'Geist Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+/* ── TWO-COL LAYOUT ── */
+.results-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 780px) {
+  .results-grid { grid-template-columns: 1fr; }
+}
+
+/* ── CARDS ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.card-header {
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-label {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+.card-body { padding: 18px 20px; }
+
+/* ── AI SUMMARY ── */
+.ai-summary-text {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text);
+  font-weight: 300;
+}
+
+.ai-signal-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.signal-tag {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-family: 'Geist Mono', monospace;
+  letter-spacing: 0.3px;
+}
+.signal-tag.bull { background: var(--green-bg); color: var(--green); }
+.signal-tag.bear { background: var(--red-bg); color: var(--red); }
+.signal-tag.neutral { background: var(--surface2); color: var(--muted); }
+.signal-tag.watch { background: var(--amber-bg); color: var(--amber); }
+.signal-tag.info { background: var(--blue-bg); color: var(--blue); }
+
+/* ── NEWS ── */
+.news-item {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.news-item:last-child { border-bottom: none; padding-bottom: 0; }
+.news-item:first-child { padding-top: 0; }
+
+.news-row1 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.news-source {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.news-age {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+}
+.news-headline {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.news-snippet { font-size: 13px; color: var(--muted); line-height: 1.5; font-weight: 300; }
+
+.sentiment-tag {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-family: 'Geist Mono', monospace;
+  margin-top: 6px;
+}
+.sentiment-tag.pos { background: var(--green-bg); color: var(--green); }
+.sentiment-tag.neg { background: var(--red-bg); color: var(--red); }
+.sentiment-tag.neu { background: var(--surface2); color: var(--muted); }
+
+/* ── RIGHT COLUMN ── */
+.prob-card .card-body {
+  text-align: center;
+  padding: 24px 20px;
+}
+
+.prob-display {
+  font-family: 'Instrument Serif', serif;
+  font-size: 72px;
+  letter-spacing: -2px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.prob-display.high { color: var(--green); }
+.prob-display.mid  { color: var(--amber); }
+.prob-display.low  { color: var(--red); }
+
+.prob-label { font-size: 13px; color: var(--muted); margin-bottom: 20px; font-weight: 300; }
+
+.prob-bar-track {
+  height: 6px;
+  background: var(--surface2);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.prob-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+}
+.prob-bar-fill.high { background: var(--green); }
+.prob-bar-fill.mid  { background: var(--amber); }
+.prob-bar-fill.low  { background: var(--red); }
+
+.prob-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.pstat {
+  background: var(--surface2);
+  border-radius: 10px;
+  padding: 10px 12px;
+  text-align: left;
+}
+.pstat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; font-family: 'Geist Mono', monospace; }
+.pstat-val { font-family: 'Geist Mono', monospace; font-size: 15px; font-weight: 500; }
+
+/* ── SENTIMENT ── */
+.sent-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.sent-row:last-child { margin-bottom: 0; }
+.sent-lbl { font-size: 12px; color: var(--muted); width: 56px; flex-shrink: 0; }
+.sent-track { flex: 1; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+.sent-fill { height: 100%; border-radius: 3px; }
+.sent-pct { font-family: 'Geist Mono', monospace; font-size: 12px; width: 32px; text-align: right; flex-shrink: 0; }
+
+/* ── MINI CHART ── */
+.mini-chart { width: 100%; height: 64px; }
+
+/* ── KEY FACTORS ── */
+.factor-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.factor-item:last-child { border-bottom: none; padding-bottom: 0; }
+.factor-item:first-child { padding-top: 0; }
+.factor-icon {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+.fi-up { background: var(--green-bg); }
+.fi-down { background: var(--red-bg); }
+.fi-neutral { background: var(--surface2); }
+.factor-text { font-size: 13px; color: var(--text); line-height: 1.45; font-weight: 300; }
+.factor-text strong { font-weight: 500; }
+
+/* ── LOADING ── */
+.loading-state {
+  display: none;
+  padding: 80px 0;
+  text-align: center;
+}
+.loading-state.show { display: block; }
+
+.loading-ring {
+  width: 40px; height: 40px;
+  border: 2px solid var(--border);
+  border-top-color: var(--text);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 20px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-steps {
+  font-family: 'Geist Mono', monospace;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 2;
+}
+.loading-steps span {
+  display: block;
+  opacity: 0;
+  animation: stepIn 0.4s ease both;
+}
+.loading-steps span:nth-child(1) { animation-delay: 0.2s; }
+.loading-steps span:nth-child(2) { animation-delay: 1.0s; }
+.loading-steps span:nth-child(3) { animation-delay: 2.0s; }
+.loading-steps span:nth-child(4) { animation-delay: 3.2s; }
+@keyframes stepIn { from { opacity:0; transform: translateY(4px); } to { opacity:1; transform:none; } }
+
+/* ── SHIMMER ── */
+.shimmer {
+  background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: 6px;
+}
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* ── FOOTER ── */
+footer {
+  margin-top: 80px;
+  padding: 24px 0 40px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.footer-note { font-size: 12px; color: var(--muted); font-weight: 300; }
+.footer-powered { font-family: 'Geist Mono', monospace; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+
+/* ── MARKET EXPLORER ── */
+.explorer-section {
+  margin-top: 48px;
+  animation: fadeUp 0.6s ease both;
+}
+.explorer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.explorer-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: 24px;
+  color: var(--text);
+}
+
+.odds-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.odds-row {
+  display: grid;
+  grid-template-columns: 1fr 100px 100px 100px;
+  padding: 16px 12px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.odds-row:hover { background: var(--surface); }
+.odds-row.header {
+  cursor: default;
+  background: transparent;
+  padding: 8px 12px;
+  border-top: none;
+}
+.odds-row.header .odds-col {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.odds-col { display: flex; align-items: center; }
+.odds-col.center { justify-content: center; }
+.odds-col.right { justify-content: flex-end; }
+
+.odds-m-title { font-size: 14px; font-weight: 500; color: var(--text); }
+.odds-prob { font-family: 'Geist Mono', monospace; font-size: 15px; font-weight: 600; }
+.odds-delta { font-family: 'Geist Mono', monospace; font-size: 12px; }
+.odds-delta.up { color: var(--green); }
+.odds-delta.down { color: var(--red); }
+.odds-vol { font-family: 'Geist Mono', monospace; font-size: 13px; color: var(--muted); }
+
+.show-more-btn {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  background: transparent;
+  border: 1px dashed var(--border2);
+  border-radius: 12px;
+  color: var(--muted);
+  font-family: 'Geist Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 20px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.show-more-btn:hover {
+  border-color: var(--text);
+  color: var(--text);
+  background: var(--surface);
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="wordmark">Poly<em>lens</em></div>
+    <div class="header-tag">Market Intelligence</div>
+  </header>
+
+  <div class="hero" id="hero">
+    <div class="hero-eyebrow">Prediction Market Research</div>
+    <h1 class="hero-title">What's the market<br><em>saying?</em></h1>
+    <p class="hero-sub">Enter any prediction market topic or question — get instant AI-powered research.</p>
+
+    <div class="search-wrap">
+      <input type="text" id="query" placeholder="e.g. Will the Fed cut rates in May 2025?" autocomplete="off" />
+      <button class="search-btn" id="search-btn" onclick="runSearch()">Research →</button>
+    </div>
+
+    <div class="example-queries">
+      <span class="eq-label">Try:</span>
+      <span class="eq-pill" onclick="setQuery('Will Bitcoin hit $120k in 2025?')">Bitcoin $120k</span>
+      <span class="eq-pill" onclick="setQuery('Will the Fed cut rates in May 2025?')">Fed rate cut</span>
+      <span class="eq-pill" onclick="setQuery('Will OpenAI release GPT-5 before September 2025?')">GPT-5 launch</span>
+    </div>
+
+    <div style="margin-top:24px">
+      <button class="search-btn" id="hero-deep-btn" onclick="runSearch(true)" style="background:var(--blue);color:white;width:auto">Deep Agent Search →</button>
+    </div>
+  </div>
+
+  <div class="loading-state" id="loading">
+    <div class="loading-ring"></div>
+    <div class="loading-steps" id="loading-steps">
+      <span>↗ Fetching real Polymarket data…</span>
+      <span>◎ Reading market signals…</span>
+      <span>⬡ Analysing related markets…</span>
+      <span>✦ Synthesising with Gemini…</span>
+    </div>
+  </div>
+
+  <!-- MARKET EXPLORER (UNIFIED DISCOVERY) -->
+  <div class="explorer-section" id="explorer-section">
+    <div class="explorer-header">
+      <div class="explorer-title" id="explorer-title">Trending Markets</div>
+      <div class="header-tag" id="explorer-count"></div>
+    </div>
+    
+    <div class="card">
+      <div class="odds-row header">
+        <div class="odds-col">Market</div>
+        <div class="odds-col center">Odds</div>
+        <div class="odds-col center">24h</div>
+        <div class="odds-col right">Volume</div>
+      </div>
+      <div id="odds-list"></div>
+    </div>
+    
+    <button class="show-more-btn" id="show-more-btn" onclick="toggleShowMore()">Show More Markets ↓</button>
+  </div>
+
+  <div id="results">
+    <div class="results-header">
+      <div class="results-query" id="results-query"></div>
+      <div class="results-meta" id="results-meta"></div>
+    </div>
+
+    <div class="results-grid">
+      <!-- LEFT COL -->
+      <div>
+        <!-- AI Summary -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-label">✦ AI Analysis</div>
+            <div class="card-label" id="confidence-badge"></div>
+          </div>
+          <div class="card-body">
+            <div class="ai-summary-text" id="ai-summary"></div>
+            <div class="ai-signal-row" id="ai-signals"></div>
+            <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+              <button class="search-btn" id="deep-research-btn" onclick="runDeepResearch()" style="margin:0;width:100%;background:var(--blue);color:white">Run Deep Web Research with Agent →</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Agent Brief -->
+        <div id="agent-brief-card" class="card" style="display:none;border:1px solid var(--blue)">
+          <div class="card-header" style="background:var(--blue-bg)">
+            <div class="card-label" style="color:var(--blue)">🕵️ Deep Research Brief</div>
+            <div class="card-label" style="color:var(--blue)">Agent Live</div>
+          </div>
+          <div class="card-body">
+            <pre id="agent-output" style="white-space:pre-wrap;font-family:'Geist Mono',monospace;font-size:12px;color:var(--text);line-height:1.6"></pre>
+          </div>
+        </div>
+
+        <!-- Key Factors -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-label">Key factors</div>
+          </div>
+          <div class="card-body" id="key-factors"></div>
+        </div>
+
+        <!-- News -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-label">Latest news</div>
+            <div class="card-label" id="news-count"></div>
+          </div>
+          <div class="card-body" id="news-list" style="padding-top:4px;padding-bottom:4px"></div>
+        </div>
+      </div>
+
+      <!-- RIGHT COL -->
+      <div>
+        <!-- Probability -->
+        <div class="card prob-card">
+          <div class="card-header">
+            <div class="card-label">Implied probability</div>
+          </div>
+          <div class="card-body">
+            <div class="prob-display" id="prob-display">—</div>
+            <div class="prob-label" id="prob-label"></div>
+            <div class="prob-bar-track">
+              <div class="prob-bar-fill" id="prob-bar" style="width:0%"></div>
+            </div>
+            <div class="prob-stats" id="prob-stats"></div>
+          </div>
+        </div>
+
+        <!-- Price chart -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-label">30-day trend</div>
+          </div>
+          <div class="card-body" style="padding: 12px 16px">
+            <svg class="mini-chart" id="mini-chart" viewBox="0 0 300 64" preserveAspectRatio="none"></svg>
+          </div>
+        </div>
+
+        <!-- Sentiment -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-label">Community sentiment</div>
+          </div>
+          <div class="card-body" id="sentiment-card"></div>
+        </div>
+
+        <!-- Market Links -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-label">Related markets</div>
+          </div>
+          <div class="card-body" id="related-markets" style="padding-top:4px;padding-bottom:4px"></div>
+        </div>
+      </div>
+    </div>
+
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-note">Live data from Polymarket Gamma API · Analysis by Gemini.</div>
+    <div class="footer-powered">Powered by Gemini + Polymarket</div>
+  </footer>
+
+</div>
+
+<script>
+const GAMMA_API   = '/gamma';  // proxied via proxy_server.py → gamma-api.polymarket.com
+const AI_PROXY    = '/ai/summary'; // Secure backend proxy for Gemini
+const geminiCache = new Map(); // simple in-memory cache
+
+function setQuery(q) {
+  document.getElementById('query').value = q;
+  document.getElementById('query').focus();
+}
+
+document.getElementById('query').addEventListener('keydown', e => {
+  if (e.key === 'Enter') runSearch();
+});
+
+// ── HELPERS ──────────────────────────────────────────────
+function fmtDollars(n) {
+  n = parseFloat(n) || 0;
+  if (n >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return '$' + (n / 1e3).toFixed(0) + 'K';
+  return '$' + n.toFixed(0);
+}
+
+function extractGammaData(event) {
+  const m = (event.markets || [])[0] || {};
+  let prices = [0.5, 0.5];
+  try {
+     prices = JSON.parse(m.outcomePrices || '["0.5","0.5"]').map(p => parseFloat(p) || 0.5);
+  } catch(e) { console.warn('Price parse failed'); }
+  
+  const outcomes = (m.outcomes ? JSON.parse(m.outcomes) : ['Yes','No']);
+  const isMulti = outcomes.length > 2;
+  
+  const yesPrice = prices[0];
+  const probability = Math.round(yesPrice * 100);
+  
+  // Real volume from Gamma event level
+  const vol = parseFloat(event.volumeNum || event.volume || '0');
+  const liq = parseFloat(event.liquidityNum || event.liquidity || '0');
+  
+  const rawDelta = parseFloat(m.oneDayPriceChange || '0');
+  const delta24h = (rawDelta >= 0 ? '+' : '') + (rawDelta * 100).toFixed(1) + '%';
+  const deltaDirection = rawDelta > 0.002 ? 'up' : rawDelta < -0.002 ? 'down' : 'neutral';
+  
+  return {
+    title: event.title || event.slug || 'Market',
+    slug: event.slug || '',
+    probability,
+    probabilityLabel: isMulti ? `Leading: ${outcomes[0]}` : 'Implied probability',
+    delta24h,
+    deltaDirection,
+    volume: fmtDollars(vol),
+    liquidity: fmtDollars(liq),
+    outcomes,
+    outcomePrices: prices,
+    description: event.description || '',
+    isMulti
+  };
+}
+
+// ── TOP MARKETS FEED ─────────────────────────────────────
+async function loadTopMarkets() {
+  try {
+    const res = await fetch(`${GAMMA_API}/events?order=volume&ascending=false&active=true&closed=false&limit=30`);
+    const events = await res.json();
+    const currentTrending = events.map(ev => extractGammaData(ev));
+    
+    // Populate the Market Explorer with Trending data
+    window.allRelated = currentTrending; 
+    document.getElementById('explorer-title').textContent = 'Trending Markets';
+    document.getElementById('explorer-count').textContent = currentTrending.length + ' live events';
+    renderOddsRows(currentTrending.slice(0, 10));
+    
+  } catch(e) {
+    console.warn('Top markets load failed:', e);
+  }
+}
+
+// ── SEARCH FLOW ──────────────────────────────────────────
+async function runSearch(deep = false) {
+  const q = document.getElementById('query').value.trim();
+  if (!q) return;
+
+  document.getElementById('search-btn').disabled = true;
+  document.getElementById('hero-deep-btn').disabled = true;
+  document.getElementById('hero').classList.add('compact');
+  document.getElementById('results').classList.remove('show');
+  document.getElementById('loading').classList.add('show');
+  document.getElementById('agent-brief-card').style.display = 'none';
+
+  const btn = deep ? document.getElementById('deep-research-btn') : document.querySelector('button[onclick*="runSearch"]');
+  const originalText = btn ? btn.textContent : 'Research →';
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = deep ? '🕵️ Agent is browsing...' : 'Researching...';
+  }
+
+  const stepsEl = document.getElementById('loading-steps');
+  stepsEl.innerHTML = `
+    <span>↗ Fetching real Polymarket data…</span>
+    <span>◎ Reading market signals…</span>
+    <span>⬡ Analysing related markets…</span>
+    <span>✦ Synthesising with Gemini…</span>
+  `;
+
+  try {
+    const data = await fetchResearch(q, deep);
+    renderResults(q, data);
+  } catch(e) {
+    console.error(e);
+    alert('Something went wrong: ' + e.message);
+  } finally {
+    document.getElementById('loading').classList.remove('show');
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  }
+}
+
+// ── STEP 1: Fetch real Gamma data (with better matching) ─────────
+async function fetchGammaEvent(query) {
+  console.log('FETCHING Gamma events for:', query);
+  // Increase limit to 50 to find better matches beyond top-volume generic markets
+  const url = `${GAMMA_API}/events?q=${encodeURIComponent(query)}&active=true&closed=false&limit=50&order=volume&ascending=false`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Gamma API error: ${res.status}`);
+  const events = await res.json();
+  if (!events || events.length === 0) {
+    console.warn('No Gamma events found for:', query);
+    return null;
+  }
+
+  // Stricter title matching: find markets where at least one word from query is in the title
+  const qWords = query.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 3);
+  
+  // Try exact word matches first
+  let matches = events.filter(ev => {
+    const title = (ev.title || '').toLowerCase();
+    return qWords.length > 0 && qWords.some(w => title.includes(w));
+  });
+
+  if (matches.length > 0) {
+    // Pick the one with the most word matches
+    matches.sort((a, b) => {
+      const aCount = qWords.filter(w => a.title.toLowerCase().includes(w)).length;
+      const bCount = qWords.filter(w => b.title.toLowerCase().includes(w)).length;
+      return bCount - aCount;
+    });
+    console.log('Best match found by title relevance:', matches[0].title);
+    return matches[0];
+  }
+
+  console.log('No direct title match in top 50, falling back to top volume event:', events[0].title);
+  return events[0]; 
+}
+
+// ── DEEP RESEARCH (BROWSER-USE) ──────────────────────────
+async function runDeepResearch() {
+  const q = document.getElementById('results-query').textContent;
+  const btn = document.getElementById('deep-research-btn');
+  const card = document.getElementById('agent-brief-card');
+  const out = document.getElementById('agent-output');
+
+  btn.disabled = true;
+  btn.textContent = '🕵️ Agent researching web (this takes 1-2 mins)...';
+  card.style.display = 'block';
+  out.textContent = 'Launching browser-use agent...\nConnecting to Gemini...\nSearching news and web data...\n';
+  card.scrollIntoView({ behavior: 'smooth' });
+
+  try {
+    const res = await fetch('/research', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: q, deep: true })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    
+    // For deep research, the agent returns the full JSON. 
+    // We update the local UI and also re-render the whole page with the new deep data.
+    renderResults(q, data);
+    btn.textContent = '✓ Web Research Complete';
+  } catch(e) {
+    console.error(e);
+    out.textContent = 'Error during agent research: ' + e.message;
+    btn.textContent = 'Retry Deep Research →';
+    btn.disabled = false;
+  }
+}
+
+// ── STEP 2: Fetch related markets ────────────────────────
+async function fetchRelatedGamma(query) {
+  const url = `${GAMMA_API}/events?q=${encodeURIComponent(query)}&active=true&closed=false&limit=12&order=volume&ascending=false`;
+  const res = await fetch(url);
+  const events = await res.json();
+  return (events || []).slice(1, 11); // top 10 as related (excluding the main result)
+}
+
+// ── MAIN fetchResearch (Driven by Backend Agent) ───────────
+async function fetchResearch(query, deep = false) {
+  const stepsEl = document.getElementById('loading-steps');
+  
+  // 1. Trigger agent research via proxy
+  console.log('AGENT RESEARCH:', query, (deep ? '[DEEP]' : '[FAST]'));
+  
+  const res = await fetch('/research', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, deep })
+  });
+  
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Agent research failed');
+  }
+
+  return await res.json();
+}
+
+// ── RENDER RESULTS ──────────────────────────────────────
+function renderResults(query, d) {
+  // Extract data from unified agent object
+  // Handle input validation errors from agent
+  if (d.validationError) {
+    document.getElementById('results').classList.add('show');
+    document.getElementById('results-query').textContent = query; // Changed from market-title to results-query
+    document.getElementById('prob-stats').innerHTML = `
+      <div class="stat-card" style="grid-column: span 3; border: 1px dashed #ef4444; background: rgba(239, 68, 68, 0.05);">
+        <p style="color: #ef4444; font-weight: 500; font-size: 1.1rem; margin-bottom: 0.5rem;">⚠️ Topic Not Found</p>
+        <p style="color: #94a3b8; line-height: 1.5;">${d.validationError}</p>
+      </div>`; // Changed from market-stats to prob-stats
+    document.getElementById('agent-brief-card').style.display = 'none';
+    document.getElementById('related-markets').innerHTML = '<p style="color: #64748b; padding: 1rem;">Try searching for specific events like "Bitcoin $120k" or "Fed rate cut".</p>'; // Changed from related-grid to related-markets
+    return;
+  }
+
+  const m = d.market || {};
+  const pv = m.probability || 50;
+  const pClass = pv >= 60 ? 'high' : pv <= 40 ? 'low' : 'neutral';
+  
+  document.getElementById('results-query').textContent = m.title || query;
+  document.getElementById('prob-display').textContent = pv + '%';
+  document.getElementById('prob-label').textContent = d.probabilityLabel || 'Implied probability';
+  document.getElementById('prob-label').className = 'prob-label ' + pClass;
+  document.getElementById('prob-bar').style.width = pv + '%';
+  document.getElementById('prob-bar').style.background = pClass === 'high' ? 'var(--green)' : pClass === 'low' ? 'var(--red)' : 'var(--amber)';
+  
+  document.getElementById('prob-stats').innerHTML = `
+    <span>Volume ${m.volume || '—'}</span>
+    <span>Liquidity ${m.liquidity || '—'}</span>
+  `;
+
+  document.getElementById('ai-summary').textContent = d.summary || '';
+  document.getElementById('confidence-badge').textContent = pv >= 70 ? '● Strong signal' : pv >= 50 ? '● Moderate signal' : '● Uncertain';
+  document.getElementById('confidence-badge').style.color = pClass === 'high' ? 'var(--green)' : pClass === 'low' ? 'var(--red)' : 'var(--amber)';
+
+  const signals = (d.signals || []).map(s => `<span class="signal-tag ${s.type}">${s.label}</span>`).join('');
+  document.getElementById('ai-signals').innerHTML = signals;
+
+  document.getElementById('key-factors').innerHTML = (d.factors || []).map(f => `
+    <div class="factor-item">
+      <div class="factor-dot ${f.direction}"></div>
+      <div class="factor-content">
+        <div class="factor-title">${f.title}</div>
+        <div class="factor-detail">${f.detail}</div>
+      </div>
+    </div>
+  `).join('');
+
+  // Outcome List (for Multi-Outcome markets)
+  if (m.isMulti || (m.outcomes && m.outcomes.length > 2)) {
+    const listHtml = m.outcomes.map((label, idx) => {
+      const p = Math.round((m.outcomePrices[idx] || 0) * 100);
+      const active = idx === 0 ? 'border:1px solid var(--green);background:rgba(26,107,74,0.05)' : '';
+      return `
+        <div class="news-item" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;margin-bottom:8px;${active}">
+          <div style="font-weight:500;font-size:14px;color:var(--text)">${label}</div>
+          <div style="font-family:'Geist Mono',monospace;font-weight:600;font-size:15px;color:var(--text)">${p}%</div>
+        </div>
+      `;
+    }).join('');
+    
+    document.getElementById('ai-summary').insertAdjacentHTML('beforebegin', `
+      <div style="margin-bottom:24px">
+        <div class="card-label" style="margin-bottom:12px;opacity:0.7">Market Entries</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));gap:8px">
+          ${listHtml}
+        </div>
+      </div>
+    `);
+  }
+
+  document.getElementById('news-list').innerHTML = (d.news || []).map(n => `
+    <div class="news-item">
+      <div class="news-meta">
+        <span class="news-source">${n.source}</span>
+        <span class="news-age">${n.age}</span>
+        <span class="news-sentiment ${n.sentiment}">${n.sentiment}</span>
+      </div>
+      <div class="news-headline">${n.headline}</div>
+      <div class="news-snippet">${n.snippet}</div>
+    </div>
+  `).join('');
+  document.getElementById('news-count').textContent = (d.news || []).length + ' articles';
+
+  // Sentiment
+  const s = d.sentiment || { bull: 50, bear: 30, neutral: 20 };
+  document.getElementById('sentiment-card').innerHTML = `
+    <div class="sent-row">
+      <div class="sent-lbl">Bullish</div>
+      <div class="sent-track"><div class="sent-fill" style="width:${s.bull}%;background:var(--green)"></div></div>
+      <div class="sent-pct" style="color:var(--green)">${s.bull}%</div>
+    </div>
+    <div class="sent-row">
+      <div class="sent-lbl">Bearish</div>
+      <div class="sent-track"><div class="sent-fill" style="width:${s.bear}%;background:var(--red)"></div></div>
+      <div class="sent-pct" style="color:var(--red)">${s.bear}%</div>
+    </div>
+    <div class="sent-row">
+      <div class="sent-lbl">Neutral</div>
+      <div class="sent-track"><div class="sent-fill" style="width:${s.neutral}%;background:var(--muted)"></div></div>
+      <div class="sent-pct" style="color:var(--muted)">${s.neutral}%</div>
+    </div>
+  `;
+
+  // Chart
+  drawChart(d.chartData || [], pClass);
+
+  // Related markets (Sidebar)
+  const currentRelated = d.relatedMarkets || [];
+  document.getElementById('related-markets').innerHTML = currentRelated.slice(0, 5).map(m => {
+    const mp = m.probability || 50;
+    const mc = mp >= 60 ? 'var(--green)' : mp >= 35 ? 'var(--amber)' : 'var(--red)';
+    return `<div class="news-item" style="cursor:pointer" onclick="setQueryAndSearch('${m.title.replace(/'/g,"\\'")}')">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div style="font-size:13px;font-weight:400;line-height:1.4;color:var(--text)">${m.title}</div>
+        <div style="font-family:'Geist Mono',monospace;font-size:15px;font-weight:500;flex-shrink:0;color:${mc}">${mp}%</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Market Explorer (Switch to Related Markets)
+  const oddsList = document.getElementById('odds-list');
+  window.allRelated = currentRelated; // Store for show more
+  document.getElementById('explorer-title').textContent = 'Related Markets';
+  document.getElementById('explorer-count').textContent = currentRelated.length + ' matches for research';
+  renderOddsRows(currentRelated.slice(0, 10));
+
+  document.getElementById('results').classList.add('show');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function renderOddsRows(list) {
+  const container = document.getElementById('odds-list');
+  container.innerHTML = list.map(m => {
+    const p = m.probability || 50;
+    const pColor = p >= 60 ? 'var(--green)' : p >= 35 ? 'var(--amber)' : 'var(--red)';
+    const dVal = m.delta24h || '0%';
+    const dClass = dVal.startsWith('+') ? 'up' : dVal.startsWith('-') ? 'down' : '';
+    
+    return `
+      <div class="odds-row" onclick="setQueryAndSearch('${m.title.replace(/'/g,"\\'")}')">
+        <div class="odds-col">
+          <div class="odds-m-title">${m.title}</div>
+        </div>
+        <div class="odds-col center">
+          <div class="odds-prob" style="color:${pColor}">${p}%</div>
+        </div>
+        <div class="odds-col center">
+          <div class="odds-delta ${dClass}">${dVal}</div>
+        </div>
+        <div class="odds-col right">
+          <div class="odds-vol">${m.volume}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+let isExpanded = false;
+function toggleShowMore() {
+  const btn = document.getElementById('show-more-btn');
+  if (!isExpanded) {
+    renderOddsRows(window.allRelated);
+    btn.textContent = 'Show Less ↑';
+    isExpanded = true;
+  } else {
+    renderOddsRows(window.allRelated.slice(0, 10));
+    btn.textContent = 'Show More Markets ↓';
+    isExpanded = false;
+  }
+}
+
+function setQueryAndSearch(q) {
+  document.getElementById('query').value = q;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  setTimeout(runSearch, 150);
+}
+
+// Load top markets on page load
+window.addEventListener('DOMContentLoaded', loadTopMarkets);
+
+function drawChart(data, colorClass) {
+  if (!data.length) return;
+  const svg = document.getElementById('mini-chart');
+  const W = 300, H = 64, pad = 4;
+  const min = Math.min(...data) - 4;
+  const max = Math.max(...data) + 4;
+  const range = max - min || 1;
+  const xs = data.map((_, i) => pad + (i / (data.length - 1)) * (W - pad * 2));
+  const ys = data.map(v => H - pad - ((v - min) / range) * (H - pad * 2));
+  const pts = xs.map((x, i) => `${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
+  const areaBot = `${xs[xs.length-1].toFixed(1)},${H} ${xs[0].toFixed(1)},${H}`;
+  const color = colorClass === 'high' ? '#1a6b4a' : colorClass === 'low' ? '#b03a2e' : '#92600a';
+  const colorAlpha = colorClass === 'high' ? 'rgba(26,107,74,0.12)' : colorClass === 'low' ? 'rgba(176,58,46,0.12)' : 'rgba(146,96,10,0.12)';
+
+  svg.innerHTML = `
+    <polygon points="${pts} ${areaBot}" fill="${colorAlpha}"/>
+    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${xs[xs.length-1].toFixed(1)}" cy="${ys[ys.length-1].toFixed(1)}" r="3" fill="${color}"/>
+  `;
+}
+</script>
+</body>
+</html>
