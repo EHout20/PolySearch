@@ -32,6 +32,10 @@ GAMMA_BASE     = "https://gamma-api.polymarket.com"
 GEMINI_MODEL   = "gemini-flash-latest"
 GEMINI_BROWSER_MODEL = "gemini-flash-latest" 
 
+# Suppress browser_use logs from polluting standard output used for JSON
+os.environ["BROWSER_USE_LOGGING_LEVEL"] = "error"
+os.environ["ANONYMIZED_TELEMETRY"] = "false"
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -204,8 +208,11 @@ async def browser_research(query: str, market: dict, related: list[dict]) -> str
     except ImportError:
         return json.dumps({"error": "langchain-google-genai not installed"})
 
-    # Configure browser to be truly headless (no tabs popping up)
-    browser = Browser(config=BrowserConfig(headless=True))
+    # Configure browser to be truly headless (no tabs popping up) and disable images for speed
+    browser = Browser(config=BrowserConfig(
+        headless=True,
+        extra_chromium_args=['--blink-settings=imagesEnabled=false']
+    ))
 
     unified_prompt = f"""You are a Master Betting Intelligence Agent.
 YOUR GOAL: Provide a deeply informative and contextual briefing for "{query}".
@@ -225,7 +232,7 @@ YOUR GOAL: Provide a deeply informative and contextual briefing for "{query}".
   ]
 }}"""
 
-    print(f"\n🌐  Launching SILENT Multi-Agent Deep Research for: {query}\n")
+    sys.stderr.write(f"\n🌐  Launching SILENT Multi-Agent Deep Research for: {query}\n")
     
     # NEW: Fetch comments from Gamma
     event_id = market.get("eventId")
@@ -308,7 +315,7 @@ RETURN ONLY A RAW JSON OBJECT:
             
     except Exception as e:
         # Generate a high-quality fallback
-        print(f"❌ Error in deep research: {str(e)}")
+        print(f"❌ Error in deep research: {str(e)}", file=sys.stderr)
         fallback = {
             "summary": f"Polymarket data for {query} is available, but deep research encountered an issue. Implied probability: {market.get('probability', 50)}%.",
             "report": "Intelligence report unavailable due to a technical error. Please try again later.",
@@ -435,11 +442,13 @@ async def main():
     
     if not is_valid:
         if as_json:
+            print("---JSON_START---")
             print(json.dumps({
                 "validationError": f"The query '{query}' does not match any current Polymarket event. Please try a more specific topic.",
                 "market": market,
                 "relatedMarkets": []
             }))
+            print("---JSON_END---")
             return
         else:
             print(f"❌  Validation Error: '{query}' not found in active markets.")
@@ -482,7 +491,9 @@ async def main():
                 # but we need to ensure it didn't just dump the JSON string into the summary field.
                 if "summary" not in out:
                     out["summary"] = "AI Analysis completed."
+            print("---JSON_START---")
             print(json.dumps(out))
+            print("---JSON_END---")
         except Exception as e:
             fallback = {
                 "market": market if market else {"title": query, "probability": 50},
@@ -493,7 +504,9 @@ async def main():
                 "sentiment": {"bull": 50, "bear": 30, "neutral": 20},
                 "chartData": [50]*13
             }
+            print("---JSON_START---")
             print(json.dumps(fallback))
+            print("---JSON_END---")
     else:
         print(f"\n{'─'*60}\nANALYST BRIEF\n{'─'*60}\n{summary}\n{'─'*60}\n")
 
