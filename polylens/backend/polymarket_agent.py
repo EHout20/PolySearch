@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 #!/usr/bin/env python3
 """
 polymarket_agent.py — Polymarket research agent using Gamma API + browser-use + Gemini
@@ -21,22 +20,10 @@ from urllib.error import URLError
 
 # ── Load .env from root folder ─────────────────────────────────────────────
 env_path = Path(__file__).parent / ".env"
-=======
-import os
-import sys
-import json
-import asyncio
-from pathlib import Path
-from datetime import datetime
-
-# ── Load .env from root folder ─────────────────────────────────────────────
-env_path = Path(__file__).parent.parent / ".env"
->>>>>>> 8eaa068 (mvp version1 complete)
 if env_path.exists():
     for line in env_path.read_text().splitlines():
         line = line.strip()
         if line and not line.startswith("#") and "=" in line:
-<<<<<<< HEAD
             k, _, v = line.partition("=")
             os.environ.setdefault(k.strip(), v.strip())
 
@@ -185,146 +172,6 @@ async def browser_research(query: str, market: dict, related: list[dict]) -> str
     try:
         from browser_use import Agent, Browser
         # from browser_use.browser.session import BrowserSession as Browser # Alternative if needed
-=======
-            k, v = line.split("=", 1)
-            os.environ[k.strip()] = v.strip()
-
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-GEMINI_MODEL = "gemini-flash-latest"
-GEMINI_BROWSER_MODEL = "gemini-flash-latest"
-
-# ── Step 1: Fetch from Gamma API ─────────────────────────────────────────────
-def fetch_gamma(query: str):
-    """Search Gamma API for the most relevant active market."""
-    import urllib.request
-    from urllib.parse import quote
-    
-    encoded = quote(query)
-    url = f"https://gamma-api.polymarket.com/events?q={encoded}&active=true&closed=false&limit=20&order=volume&ascending=false"
-    
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req) as resp:
-            events = json.loads(resp.read())
-            if not events: return None, [], False
-            
-            # ── Helper for dollar formatting ──
-            def fmt_dollars(n):
-                val = float(n) if n else 0
-                if val >= 1e6: return f"${val/1e6:.1f}M"
-                if val >= 1e3: return f"${val/1e3:.0f}K"
-                return f"${val:.0f}"
-
-            # ── Market Data Extraction Helper ──
-            def extract_data(event):
-                markets = event.get("markets", [])
-                if not markets: return None
-                
-                # Check for grouped sub-markets
-                is_grouped = len(markets) > 2 and all("groupItemTitle" in m or "question" in m for m in markets[:5])
-                
-                if is_grouped:
-                    candidates = []
-                    for m in markets:
-                        prices = json.loads(m.get("outcomePrices", "[0, 0]"))
-                        label = m.get("groupItemTitle") or m.get("question") or "Unknown"
-                        price = float(prices[0]) if prices else 0
-                        candidates.append({"label": label, "price": price})
-                    candidates.sort(key=lambda x: x["price"], reverse=True)
-                    
-                    return {
-                        "id": event.get("id"),
-                        "eventId": event.get("id"),
-                        "title": event.get("title"),
-                        "slug": event.get("slug"),
-                        "probability": round(candidates[0]["price"] * 100) if candidates else 50,
-                        "delta24h": "+0.0%",
-                        "deltaDirection": "neutral",
-                        "volume": fmt_dollars(event.get("volumeNum", 0)),
-                        "liquidity": fmt_dollars(event.get("liquidityNum", 0)),
-                        "outcomes": [c["label"] for c in candidates],
-                        "outcomePrices": [c["price"] for c in candidates],
-                        "clobTokenIds": [],
-                        "isMulti": True
-                    }
-                
-                # Standard market
-                m = markets[0]
-                prices = json.loads(m.get("outcomePrices", "[0.5, 0.5]"))
-                outcomes = json.loads(m.get("outcomes", '["Yes", "No"]'))
-                raw_delta = float(m.get("oneDayPriceChange", 0))
-                
-                return {
-                    "id": m.get("id"),
-                    "eventId": event.get("id"),
-                    "title": event.get("title"),
-                    "slug": event.get("slug"),
-                    "probability": round(float(prices[0])*100),
-                    "delta24h": (f"+{raw_delta*100:.1f}%" if raw_delta >= 0 else f"{raw_delta*100:.1f}%"),
-                    "deltaDirection": "up" if raw_delta > 0.002 else "down" if raw_delta < -0.002 else "neutral",
-                    "volume": fmt_dollars(event.get("volumeNum", 0)),
-                    "liquidity": fmt_dollars(event.get("liquidityNum", 0)),
-                    "outcomes": outcomes,
-                    "outcomePrices": [float(p) for p in prices],
-                    "clobTokenIds": json.loads(m.get("clobTokenIds", "[]")),
-                    "isMulti": len(outcomes) > 2
-                }
-
-            # Simple scoring for relevance
-            lq = query.lower()
-            scored = []
-            for e in events:
-                title = e.get("title", "").lower()
-                score = sum(2 for w in lq.split() if len(w) > 2 and w in title)
-                # Volume bonus
-                score += (float(e.get("volumeNum", 0)) / 1_000_000)
-                scored.append((score, e))
-            
-            scored.sort(key=lambda x: x[0], reverse=True)
-            top_event = scored[0][1]
-            
-            market_data = extract_data(top_event)
-            if not market_data: return None, [], False
-            
-            # Extract related markets (top 10 after the main one)
-            related_markets = []
-            num_scored = len(scored)
-            if num_scored > 1:
-                # Use enumerate to avoid explicit counter addition which confuses some linters
-                for i, item in enumerate(scored):
-                    if i == 0: continue # Skip main market
-                    if i > 11: break # Max 10 related
-                    e = item[1]
-                    rd = extract_data(e)
-                    if rd: 
-                        related_markets.append(rd)
-                
-            return market_data, related_markets, True
-    except Exception as e:
-        print(f"Gamma Error: {e}")
-        return None, [], False
-
-# ── Step 2: Fetch Comments ──────────────────────────────────────────────────
-def fetch_comments(event_id: str):
-    """Fetch recent community comments for a given event ID."""
-    import urllib.request
-    url = f"https://gamma-api.polymarket.com/comments?eventId={event_id}&limit=20"
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req) as resp:
-            data = json.loads(resp.read())
-            return [c.get("comment", "") for c in data if c.get("comment")]
-    except:
-        return []
-
-# ── Step 3: browser-use web research (Consolidated Call) ─────────────────────
-async def browser_research(query: str, market: dict, related: list[dict], as_json: bool = False) -> str:
-    """
-    Use browser-use + Gemini to find recent web content and generate the ANALYST BRIEF in one go.
-    """
-    try:
-        from browser_use import Agent, Browser
->>>>>>> 8eaa068 (mvp version1 complete)
     except ImportError as e:
         return json.dumps({"error": f"browser-use not available: {e}"})
 
@@ -333,11 +180,8 @@ async def browser_research(query: str, market: dict, related: list[dict], as_jso
 
     try:
         from langchain_google_genai import ChatGoogleGenerativeAI
-<<<<<<< HEAD
         
         # Transparent Proxy to bypass Pydantic monkeypatching issues
-=======
->>>>>>> 8eaa068 (mvp version1 complete)
         class TransparentProxy:
             def __init__(self, **kwargs):
                 self._llm = ChatGoogleGenerativeAI(**kwargs)
@@ -351,46 +195,21 @@ async def browser_research(query: str, market: dict, related: list[dict], as_jso
             def bind_tools(self, *args, **kwargs):
                 return self._llm.bind_tools(*args, **kwargs)
             async def ainvoke(self, *args, **kwargs):
-<<<<<<< HEAD
                 return await self._llm.ainvoke(*args, **kwargs)
             def invoke(self, *args, **kwargs):
                 return self._llm.invoke(*args, **kwargs)
             
-=======
-                res = await self._llm.ainvoke(*args, **kwargs)
-                # Ensure usage data exists for browser-use (OpenAI-style keys for Pydantic validation)
-                u = {
-                    'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0,
-                    'prompt_cached_tokens': 0, 'prompt_cache_creation_tokens': 0, 'prompt_image_tokens': 0
-                }
-                if not hasattr(res, 'usage_metadata'): setattr(res, 'usage_metadata', u)
-                if not hasattr(res, 'usage'): setattr(res, 'usage', u)
-                return res
-            def invoke(self, *args, **kwargs):
-                res = self._llm.invoke(*args, **kwargs)
-                u = {
-                    'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0,
-                    'prompt_cached_tokens': 0, 'prompt_cache_creation_tokens': 0, 'prompt_image_tokens': 0
-                }
-                if not hasattr(res, 'usage_metadata'): setattr(res, 'usage_metadata', u)
-                if not hasattr(res, 'usage'): setattr(res, 'usage', u)
-                return res
->>>>>>> 8eaa068 (mvp version1 complete)
         llm = TransparentProxy(model=GEMINI_BROWSER_MODEL, api_key=GOOGLE_API_KEY)
     except ImportError:
         return json.dumps({"error": "langchain-google-genai not installed"})
 
-<<<<<<< HEAD
     # Configure browser to be truly headless (no tabs popping up)
     # Configure browser - in 0.12.2 Browser defaults to headless or can be configured via Agent
-=======
->>>>>>> 8eaa068 (mvp version1 complete)
     browser = Browser()
 
     unified_prompt = f"""You are a Master Betting Intelligence Agent.
 YOUR GOAL: Provide a deeply informative and contextual briefing for "{query}".
 
-<<<<<<< HEAD
 1. WEB RESEARCH: Go to google.com and search for "{query} latest injuries standings news statistics".
 2. EXTRACTION: Find and extract:
    - COMPREHENSIVE CONTEXT: Explain the league, event, or topic status. If sports, get records, seeds, and season storylines.
@@ -412,81 +231,24 @@ YOUR GOAL: Provide a deeply informative and contextual briefing for "{query}".
     event_id = market.get("eventId")
     comments_list = fetch_comments(event_id) if event_id else []
     comments_block = "\n".join([f"- {c}" for c in comments_list[:10]]) if comments_list else "No recent community comments found."
-=======
-1. WEB RESEARCH: 
-   - Search for "{query} latest news status standings facts".
-   - Search for "{query} recent results and performance data".
-   - Search for "{query} betting markets and experts opinion".
-   - CRITICAL: For each result, CLICK on the article link to navigate to the actual page, then capture the full URL from the browser address bar.
-2. EXTRACTION: Find and extract:
-   - COMPREHENSIVE CONTEXT: Detailed stats, current rankings, recent win/loss streaks, and historical context.
-   - PERSONNEL & PHYSICALS: Specific injury reports, player availability, coaching changes, or team news.
-   - REAL NEWS ARTICLES: Find at least 5-8 HIGH-QUALITY news articles. For EACH article:
-     * CLICK the link to open the page
-     * Copy the EXACT URL from the address bar (must start with https://)
-     * Capture: Source name, Timestamp, Headline, 3-4 sentence snippet
-3. OUTPUT: Return ONLY a RAW JSON object. DO NOT include markdown formatting like ```json.
-{{
-  "briefing": "Extremely detailed educational context. Explain the entities involved, the history, and the current stakes (at least 350 words).",
-  "intel": "A massive bulleted list of raw facts: Injury lists with specifics, recent scorelines, head-to-head records, and statistical advantages.",
-  "news": [
-    {{"source": "ESPN", "age": "2 hours ago", "headline": "Exact Headline Here", "snippet": "Detailed snippet...", "sentiment": "bull|bear|neutral", "url": "https://espn.com/exact/article/url"}},
-    ...
-  ]
-}}
-IMPORTANT: The url field MUST be the direct article URL, not a search result URL or google.com link."""
-
-    if not as_json:
-        print(f"\n🌐  Launching HEAVY-DUTY Deep Research for: {query}\n")
-    
-    # Silence browser-use logs if json output requested
-    import logging
-    if as_json:
-        logging.getLogger('browser_use').setLevel(logging.WARNING)
-    
-    event_id = market.get("eventId")
-    comments_list = fetch_comments(event_id) if event_id else []
-    num_comments = len(comments_list)
-    top_comments = []
-    for i in range(min(num_comments, 15)):
-        top_comments.append(f"- {comments_list[i]}")
-    comments_block = "\n".join(top_comments) if top_comments else "No recent community comments found."
->>>>>>> 8eaa068 (mvp version1 complete)
 
     agent = Agent(task=unified_prompt, llm=llm, browser=browser, use_vision=False)
     
     try:
-<<<<<<< HEAD
         history = await agent.run(max_steps=15)
         raw_result = history.final_result() or "{}"
         
         # Clean potential markdown
-=======
-        history = await agent.run(max_steps=20)
-        raw_result = history.final_result() or "{}"
-        
->>>>>>> 8eaa068 (mvp version1 complete)
         cleaned_json = raw_result.replace("```json", "").replace("```", "").strip()
         data = {}
         try:
             data = json.loads(cleaned_json)
         except:
-<<<<<<< HEAD
             data = {"briefing": cleaned_json, "intel": "Data extraction failed", "news": []}
-=======
-            import re
-            match = re.search(r'(\{.*\})', cleaned_json, re.DOTALL)
-            if match:
-                try: data = json.loads(match.group(1))
-                except: data = {}
-            else:
-                data = {"briefing": cleaned_json, "intel": "Data extraction failed", "news": []}
->>>>>>> 8eaa068 (mvp version1 complete)
 
         edu_text = data.get("briefing", "No briefing found.")
         news_list = data.get("news", [])
         scraped_intel = data.get("intel", "")
-<<<<<<< HEAD
 
         # Determine probability for context
         prob = 50
@@ -537,56 +299,10 @@ RETURN ONLY A RAW JSON OBJECT:
   "news": [ ... ],
   "sentiment": {{"bull": x, "bear": y, "neutral": z}},
   "probabilityLabel": "Market Label",
-=======
-        prob = market.get('probability', 50)
-
-        synthesize_prompt = f"""You are a Lead Quant & Betting Strategist.
-YOUR GOAL: Produce a professional-grade, high-conviction intelligence dossier for "{query}".
-
-RAW INTEL GATHERED:
-{edu_text}
-
-FACTUAL EVIDENCE:
-{scraped_intel}
-
-REAL-TIME NEWS SOURCES:
-{json.dumps(news_list)}
-
-COMMUNITY SENTIMENT (Direct from Polymarket):
-{comments_block}
-
-MARKET ODDS: {prob}%
-
-YOUR MISSION:
-Whip up a comprehensive, well-formatted analyst report.
-
-1. "summary": 2 paragraphs of sharp, high-level analysis.
-2. "report": A MASSIVE, structured intelligence BRIEFING (Markdown).
-   - Use # for headers and ## for subheaders.
-   - Use specific details from the "FACTUAL EVIDENCE" and "NEWS SOURCES" above. Mention players, scores, and dates.
-   - REQUIRED SECTIONS:
-     # EXECUTIVE SUMMARY
-     # PERSONNEL & TEAM HEALTH (Deep dive into injuries)
-     # STANDINGS & STATISTICAL TRENDS
-     # COMMUNITY ATTITUDE (Analyze the comments provided)
-     # ANALYST VERDICT (Final recommendation)
-3. "factors": 4 keys to the game with directions and detail.
-4. "news": The news articles provided above.
-
-RETURN ONLY A RAW JSON OBJECT:
-{{
-  "summary": "...",
-  "report": "...",
-  "factors": [ ... ],
-  "news": [ ... ],
-  "sentiment": {{"bull": x, "bear": y, "neutral": z}},
-  "probabilityLabel": "Strategic Verdict",
->>>>>>> 8eaa068 (mvp version1 complete)
   "signals": [{{ "label": "Label", "type": "warning|info|success" }}]
 }}"""
         
         final_response = await llm.ainvoke(synthesize_prompt)
-<<<<<<< HEAD
         # Ensure the response is returned as a string (it's already a JSON string from the LLM usually)
         return getattr(final_response, 'content', str(final_response))
             
@@ -598,56 +314,11 @@ RETURN ONLY A RAW JSON OBJECT:
             "report": "Intelligence report unavailable due to a technical error. Please try again later.",
             "factors": [], 
             "news": [],
-=======
-        raw_content = getattr(final_response, 'content', '')
-        # LangChain+Gemini may return a list of content parts
-        if isinstance(raw_content, list):
-            parts = []
-            for part in raw_content:
-                if isinstance(part, dict) and 'text' in part:
-                    parts.append(part['text'])
-                elif isinstance(part, str):
-                    parts.append(part)
-            final_response_text = '\n'.join(parts)
-        else:
-            final_response_text = str(raw_content)
-        
-        # Robust JSON extraction
-        cleaned = final_response_text.replace('```json', '').replace('```', '').strip()
-        start = cleaned.find('{')
-        end = cleaned.rfind('}')
-        json_str = cleaned[start:end+1] if start != -1 and end != -1 else '{}'
-        
-        try:
-            final_data = json.loads(json_str)
-            if not final_data.get("news"):
-                final_data["news"] = news_list
-            return json.dumps(final_data)
-        except Exception as parse_err:
-            print(f"⚠️ JSON parse failed ({parse_err}), returning text fallback")
-            # Return the text directly in a valid JSON container
-            fallback = {
-                "summary": final_response_text[:500] if final_response_text else "Analysis unavailable.",
-                "report": final_response_text,
-                "factors": [], "news": news_list,
-                "sentiment": {"bull": 50, "bear": 30, "neutral": 20},
-                "probabilityLabel": "Deep Research"
-            }
-            return json.dumps(fallback)
-            
-    except Exception as e:
-        print(f"❌ Error in deep research: {str(e)}")
-        fallback = {
-            "summary": f"Deep research encountered an issue for {query}. Implied probability: {market.get('probability', 50)}%.",
-            "report": "Intelligence report unavailable due to a technical error. Please try again later.",
-            "factors": [], "news": [],
->>>>>>> 8eaa068 (mvp version1 complete)
             "sentiment": {"bull": 50, "bear": 30, "neutral": 20},
             "probabilityLabel": "Market Data Only"
         }
         return json.dumps(fallback)
 
-<<<<<<< HEAD
 # ── Step 3: Gemini summarization ──────────────────────────────────────────────
 def gemini_summarize(query: str, market: dict, related: list[dict], web_snippets: str, as_json: bool = False) -> str:
     """Call Gemini REST API and return a structured analyst summary."""
@@ -736,8 +407,6 @@ Write a structured analyst brief (plain text, no JSON) that includes:
         return json.dumps({"error": str(e)}) if as_json else f"[Gemini error: {e}]"
 
 
-=======
->>>>>>> 8eaa068 (mvp version1 complete)
 # ── Main ──────────────────────────────────────────────────────────────────────
 async def main():
     import argparse
@@ -754,7 +423,6 @@ async def main():
     query = " ".join(args.query)
     as_json = args.json
 
-<<<<<<< HEAD
     if not as_json:
         print(f"\n{'='*60}")
         print(f"  Polymarket Research Agent")
@@ -763,13 +431,10 @@ async def main():
 
     # 1. Gamma API & Validation
     if not as_json: print("📡  Validating against Polymarket API…")
-=======
->>>>>>> 8eaa068 (mvp version1 complete)
     market, related, is_valid = fetch_gamma(query)
     
     if not is_valid:
         if as_json:
-<<<<<<< HEAD
             print(json.dumps({
                 "validationError": f"The query '{query}' does not match any current Polymarket event. Please try a more specific topic.",
                 "market": market,
@@ -801,34 +466,10 @@ async def main():
         # STANDARD FAST CALL: Use existing Gemini summarizer (one call only)
         if not as_json: print("✦  Synthesising with Gemini (fast scan)…")
         summary = gemini_summarize(query, market, related, "", as_json=as_json)
-=======
-            print(json.dumps({"validationError": f"The query '{query}' not found.", "market": market, "relatedMarkets": []}))
-            return
-        else:
-            print(f"❌ '{query}' not found.")
-            sys.exit(0)
-
-    if not isinstance(market, dict): market = {"title": query, "probability": 50}
-    if not isinstance(related, list): related = []
-
-    summary = ""
-    if args.deep:
-        summary = await browser_research(query, market, related, as_json)
-    else:
-        # Fallback to simple summary if not deep
-        summary = json.dumps({
-            "summary": "Deep Research required for full analysis.",
-            "report": "Intelligence report available via Deep Research.",
-            "factors": [], "news": [],
-            "sentiment": {"bull": 50, "bear": 30, "neutral": 20},
-            "probabilityLabel": "Fast Scan"
-        })
->>>>>>> 8eaa068 (mvp version1 complete)
     
     if as_json:
         try:
             out = json.loads(summary)
-<<<<<<< HEAD
             if "error" in out:
                 # Fallback if AI reached rate limit
                 out["market"] = market if market else {"title": query, "probability": 50}
@@ -856,15 +497,6 @@ async def main():
     else:
         print(f"\n{'─'*60}\nANALYST BRIEF\n{'─'*60}\n{summary}\n{'─'*60}\n")
 
-=======
-            out["market"] = market
-            out["relatedMarkets"] = related
-            print(f"---JSON_START---{json.dumps(out)}---JSON_END---")
-        except:
-            print(f"---JSON_START---{summary}---JSON_END---")
-    else:
-        print(summary)
->>>>>>> 8eaa068 (mvp version1 complete)
 
 if __name__ == "__main__":
     asyncio.run(main())
