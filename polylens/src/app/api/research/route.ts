@@ -12,6 +12,8 @@ function fmtDollars(n: any): string {
 
 function extractGammaMarket(event: any) {
   const markets = event.markets || [];
+  
+  // Detect grouped multi-outcome events
   const isGrouped = markets.length > 2 && markets.every((m: any) => {
     const o = typeof m.outcomes === 'string' ? JSON.parse(m.outcomes) : m.outcomes;
     return o?.length === 2;
@@ -21,22 +23,27 @@ function extractGammaMarket(event: any) {
     const candidates = markets
       .map((m: any) => {
         const prices = typeof m.outcomePrices === 'string' ? JSON.parse(m.outcomePrices) : (m.outcomePrices || [0, 0]);
-        return { label: m.groupItemTitle || m.question, price: parseFloat(prices[0]) || 0 };
+        const p = Array.isArray(prices) ? prices : [0, 0];
+        return { label: m.groupItemTitle || m.question, price: parseFloat(p[0]) || 0 };
       })
       .sort((a: any, b: any) => b.price - a.price);
     const topP = Math.round((candidates[0]?.price || 0) * 100);
     return {
+      id: event.id,
+      eventId: event.id,
       title: event.title || event.slug,
       slug: event.slug || '',
       probability: topP,
-      probabilityLabel: `Leading: ${candidates[0]?.label}`,
-      delta24h: '+0.0%', deltaDirection: 'neutral' as const,
+      probabilityLabel: candidates[0] ? `Leading: ${candidates[0].label}` : 'Market Odds',
+      delta24h: '+0.0%', 
+      deltaDirection: 'neutral' as const,
       volume: fmtDollars(event.volumeNum || event.volume),
       liquidity: fmtDollars(event.liquidityNum || event.liquidity),
       outcomes: candidates.map((c: any) => c.label),
       outcomePrices: candidates.map((c: any) => c.price),
       description: event.description || '',
-      isMulti: true
+      isMulti: true,
+      clobTokenIds: []
     };
   }
 
@@ -44,7 +51,7 @@ function extractGammaMarket(event: any) {
   let prices: number[] = [0.5, 0.5];
   try {
     const raw = typeof m.outcomePrices === 'string' ? JSON.parse(m.outcomePrices) : m.outcomePrices;
-    prices = (raw || []).map((p: any) => parseFloat(p) || 0);
+    prices = Array.isArray(raw) ? raw.map((p: any) => parseFloat(p) || 0) : [0.5, 0.5];
   } catch (_) {}
 
   let yesPrice = prices[0];
@@ -53,7 +60,6 @@ function extractGammaMarket(event: any) {
   const outcomes = typeof m.outcomes === 'string' ? JSON.parse(m.outcomes) : (m.outcomes || ['Yes', 'No']);
   const rawDelta = parseFloat(m.oneDayPriceChange || '0');
 
-  // Extract token IDs for price history chart
   let clobTokenIds: string[] = [];
   try {
     const raw = typeof m.clobTokenIds === 'string' ? JSON.parse(m.clobTokenIds) : m.clobTokenIds;
@@ -61,10 +67,12 @@ function extractGammaMarket(event: any) {
   } catch (_) {}
 
   return {
+    id: m.id,
+    eventId: event.id,
     title: event.title || event.slug,
     slug: event.slug || '',
     probability: Math.max(1, Math.round(yesPrice * 100)),
-    probabilityLabel: 'Implied probability',
+    probabilityLabel: outcomes.length > 2 ? `Leading: ${outcomes[0]}` : 'Implied probability',
     delta24h: (rawDelta >= 0 ? '+' : '') + (rawDelta * 100).toFixed(1) + '%',
     deltaDirection: (rawDelta > 0.002 ? 'up' : rawDelta < -0.002 ? 'down' : 'neutral') as 'up' | 'down' | 'neutral',
     volume: fmtDollars(event.volumeNum || event.volume),
@@ -179,16 +187,29 @@ export async function POST(req: Request) {
       agentProcess.stderr.on('data', (d) => { stderr += d.toString(); });
       const result: any = await new Promise((resolve, reject) => {
         agentProcess.on('close', (code) => {
-          if (code !== 0 && !stdout.includes('{')) reject(new Error(stderr || 'Agent failed'));
-          else {
+          console.log(`Agent exited with code ${code}`);
+          if (code !== 0 && !stdout.includes('{')) {
+            console.error(`Agent Error (stderr): ${stderr}`);
+            reject(new Error(stderr || 'Agent failed'));
+          } else {
             try { 
-              // Robust extraction: find the first { and last }
-              const start = stdout.indexOf('{');
-              const end = stdout.lastIndexOf('}');
-              if (start === -1 || end === -1) throw new Error('No JSON found in output');
-              resolve(JSON.parse(stdout.substring(start, end + 1))); 
+              const startMarker = '---JSON_START---';
+              const endMarker = '---JSON_END---';
+              const startIdx = stdout.indexOf(startMarker);
+              const endIdx = stdout.lastIndexOf(endMarker);
+
+              if (startIdx === -1 || endIdx === -1) {
+                console.error(`No markers in stdout. Raw: ${stdout}\nStderr: ${stderr}`);
+                throw new Error('No JSON found in output');
+              }
+
+              const jsonStr = stdout.substring(startIdx + startMarker.length, endIdx);
+              resolve(JSON.parse(jsonStr)); 
             }
-            catch (_) { reject(new Error('Failed to parse agent output: ' + stdout)); }
+            catch (_) { 
+              console.error(`Parse failed. stdout: ${stdout}\nstderr: ${stderr}`);
+              reject(new Error('Failed to parse agent output. See server logs.')); 
+            }
           }
         });
       });

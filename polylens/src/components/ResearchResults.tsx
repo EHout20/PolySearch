@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ResearchResult } from './Common';
 import PriceChart from './PriceChart';
 
@@ -17,6 +17,7 @@ const SENT_LABEL  = { bull: '▲ Bullish', bear: '▼ Bearish', neutral: '◎ Ne
 
 export default function ResearchResults({ data, query, onDeepResearch, loadingDeep, deepLog = [] }: Props) {
   const [newsExpanded, setNewsExpanded] = useState(false);
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
   const m = data.market;
 
   // ─── Validation Error ────────────────────────────────────────
@@ -162,33 +163,51 @@ export default function ResearchResults({ data, query, onDeepResearch, loadingDe
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontFamily: 'Geist Mono, monospace', fontSize: 10, color: 'var(--muted)' }}>
                   <span>YES {topP}%</span><span>NO {100 - topP}%</span>
                 </div>
+                {/* Plain-English odds explanation */}
+                <div style={{ marginTop: 14, padding: '10px 14px', background: 'var(--surface2)', borderRadius: 8, fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>
+                  💡 Polymarket traders collectively believe there&apos;s a <strong style={{ color: topColor }}>{topP}% chance</strong> this happens — and a <strong>{100 - topP}% chance</strong> it doesn&apos;t. This is based on real money wagered by thousands of traders.
+                </div>
               </div>
             </div>
           )}
 
           {/* AI SUMMARY */}
-          <div className="card" style={{ marginBottom: 24 }}>
-            <div className="card-header">
-              <div className="card-label">✦ AI Analysis</div>
-              <div className="card-label" style={{ color: 'var(--muted)', fontSize: 10 }}>Powered by Gemini</div>
-            </div>
-            <div className="card-body">
-              {data.summary?.includes('Deep Research') ? (
-                <div className="ai-summary-text" style={{ fontStyle: 'italic', color: 'var(--muted)', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <p>{data.summary}</p>
-                  <button 
-                    className="search-btn" 
-                    style={{ alignSelf: 'flex-start', fontSize: 12, padding: '8px 16px' }}
-                    onClick={onDeepResearch}
-                  >
-                    Generate Analysis →
-                  </button>
+          {(() => {
+            const summary = data.summary || '';
+            const isPrompt = summary.includes('Deep Research');
+            const LIMIT = 400;
+            const displayText = !summaryExpanded && summary.length > LIMIT
+              ? summary.slice(0, LIMIT).trimEnd() + '\u2026'
+              : summary;
+            return (
+              <div className="card" style={{ marginBottom: 24 }}>
+                <div className="card-header">
+                  <div className="card-label">✦ AI Analysis</div>
+                  <div className="card-label" style={{ color: 'var(--muted)', fontSize: 10 }}>Powered by Gemini</div>
                 </div>
-              ) : (
-                <div className="ai-summary-text" style={{ whiteSpace: 'pre-wrap' }}>{data.summary || 'AI summary loading…'}</div>
-              )}
-            </div>
-          </div>
+                <div className="card-body">
+                  {isPrompt ? (
+                    <div className="ai-summary-text" style={{ fontStyle: 'italic', color: 'var(--muted)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <p>{summary}</p>
+                      <button className="search-btn" style={{ alignSelf: 'flex-start', fontSize: 12, padding: '8px 16px' }} onClick={onDeepResearch}>
+                        Generate Analysis →
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="ai-summary-text" style={{ fontSize: 13, lineHeight: 1.65 }}>{displayText}</div>
+                      {summary.length > LIMIT && (
+                        <button onClick={() => setSummaryExpanded(!summaryExpanded)}
+                          style={{ marginTop: 8, fontSize: 12, color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
+                          {summaryExpanded ? 'Show less ↑' : 'Read more ↓'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* MAIN INTEL GRID: Report vs News */}
           <div style={{ display: 'grid', gridTemplateColumns: data.report && news.length > 0 ? '1.2fr 0.8fr' : '1fr', gap: 24, marginBottom: 24 }}>
@@ -216,7 +235,7 @@ export default function ResearchResults({ data, query, onDeepResearch, loadingDe
             )}
 
             {/* NEWS ARTICLES (Side-by-side with Report if exists) */}
-            {news.length > 0 && (
+            {news.length > 0 ? (
               <div className="card">
                 <div className="card-header">
                   <div className="card-label">📰 News & Sources</div>
@@ -224,8 +243,11 @@ export default function ResearchResults({ data, query, onDeepResearch, loadingDe
                 </div>
                 <div style={{ padding: '8px 0', maxHeight: 800, overflowY: 'auto' }}>
                   {visibleNews.map((n, i) => {
-                    const s = n.sentiment as 'bull' | 'bear' | 'neutral';
-                    const articleUrl = n.url || `https://news.google.com/search?q=${encodeURIComponent(n.headline)}&hl=en`;
+                    if (!n) return null;
+                    const s = (n.sentiment || 'neutral') as 'bull' | 'bear' | 'neutral';
+                    // Use direct URL if available, otherwise fall back to Google News search
+                    const hasRealUrl = n.url && n.url.startsWith('http') && !n.url.includes('google.com/search');
+                    const articleUrl = hasRealUrl ? n.url : `https://news.google.com/search?q=${encodeURIComponent(n.headline || query)}&hl=en`;
                     return (
                       <a key={i} href={articleUrl} target="_blank" rel="noopener noreferrer"
                         style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
@@ -236,18 +258,22 @@ export default function ResearchResults({ data, query, onDeepResearch, loadingDe
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <span style={{ fontFamily: 'Geist Mono, monospace', fontSize: 10, textTransform: 'uppercase', color: 'var(--muted)' }}>{n.source}</span>
-                              <span style={{ fontSize: 10, color: 'var(--muted)' }}>· {n.age}</span>
+                              <span style={{ fontFamily: 'Geist Mono, monospace', fontSize: 10, textTransform: 'uppercase', color: 'var(--muted)' }}>{n.source || 'News'}</span>
+                              <span style={{ fontSize: 10, color: 'var(--muted)' }}>· {n.age || 'Recent'}</span>
+                              {hasRealUrl && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(37,99,235,0.1)', color: '#2563eb', fontFamily: 'Geist Mono, monospace' }}>DIRECT LINK</span>}
                             </div>
                             <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, color: SENT_COLOR[s] || 'var(--muted)', background: SENT_BG[s] || 'transparent', fontFamily: 'Geist Mono, monospace' }}>
                               {SENT_LABEL[s] || '◎ Neutral'}
                             </span>
                           </div>
                           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, lineHeight: 1.3 }}>
-                            {n.headline}
+                            {n.headline || 'Untitled Article'}
                             <span style={{ marginLeft: 6, fontSize: 11, color: '#2563eb' }}>↗</span>
                           </div>
-                          <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4 }}>{n.snippet}</div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4 }}>{n.snippet || 'No snippet available.'}</div>
+                          {!hasRealUrl && n.headline && (
+                            <div style={{ marginTop: 5, fontSize: 10, color: 'var(--muted)', fontStyle: 'italic' }}>→ Searching Google News for this article</div>
+                          )}
                         </div>
                       </a>
                     );
@@ -261,56 +287,17 @@ export default function ResearchResults({ data, query, onDeepResearch, loadingDe
                   </div>
                 )}
               </div>
-            )}
-          </div>
-
-          {/* DEEP RESEARCH PANEL (Below the main grid) */}
-          <div className="card" style={{ marginBottom: 24, border: loadingDeep ? '1px solid #2563eb' : '1px solid var(--border)' }}>
-            <div className="card-header" style={{ background: loadingDeep ? 'rgba(37,99,235,0.04)' : 'transparent' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div className="card-label">🕵️ Deep Web Research</div>
-                {loadingDeep && (
-                  <div style={{ fontSize: 10, color: '#2563eb', fontFamily: 'Geist Mono, monospace', animation: 'none' }}>● LIVE</div>
-                )}
+            ) : data.report ? (
+              <div className="card">
+                <div className="card-header">
+                  <div className="card-label">📰 News & Sources</div>
+                </div>
+                <div className="card-body" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)' }}>
+                  <div style={{ fontSize: 24, marginBottom: 12 }}>🗞️</div>
+                  <div style={{ fontSize: 13 }}>No direct news sources found for this topic.</div>
+                </div>
               </div>
-              <button
-                className="search-btn"
-                style={{ 
-                  background: loadingDeep ? 'var(--muted)' : 'var(--blue)', 
-                  color: 'white',
-                  fontSize: 12, 
-                  padding: '8px 20px', 
-                  cursor: loadingDeep ? 'not-allowed' : 'pointer',
-                  border: 'none',
-                  borderRadius: 12,
-                  fontWeight: 600
-                }}
-                disabled={loadingDeep}
-                onClick={onDeepResearch}
-              >
-                {loadingDeep ? 'Browsing web...' : 'Launch Deep Research →'}
-              </button>
-            </div>
-            <div className="card-body" style={{ paddingTop: 12, paddingBottom: 12 }}>
-              {loadingDeep && deepLog.length === 0 && (
-                <div style={{ color: '#2563eb', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid #2563eb', borderTopColor: 'transparent', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
-                  Launching browser agent and searching the web for news…
-                </div>
-              )}
-              {deepLog.length > 0 && (
-                <div style={{ fontFamily: 'Geist Mono, monospace', fontSize: 11, color: 'var(--muted)', maxHeight: 160, overflowY: 'auto', lineHeight: 1.8 }}>
-                  {deepLog.map((line, i) => (
-                    <div key={i} style={{ color: line.startsWith('✓') ? '#1a6b4a' : line.startsWith('✦') ? '#2563eb' : 'var(--muted)' }}>{line}</div>
-                  ))}
-                </div>
-              )}
-              {!loadingDeep && deepLog.length === 0 && (
-                <p style={{ fontSize: 13, color: 'var(--muted)', margin: 0 }}>
-                  Uses browser-use AI agent to search the web and retrieve real news articles about this topic, then summarizes them with Gemini.
-                </p>
-              )}
-            </div>
+            ) : null}
           </div>
         </div>
 
@@ -330,6 +317,53 @@ export default function ResearchResults({ data, query, onDeepResearch, loadingDe
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* RELATED MARKETS ("Odds Listed Out") */}
+          {(data.relatedMarkets || []).length > 0 && (
+            <div className="card" style={{ marginBottom: 24 }}>
+              <div className="card-header">
+                <div className="card-label">🔗 Related Markets & Odds</div>
+                <div className="card-label" style={{ color: 'var(--muted)', fontSize: 10 }}>Polymarket odds</div>
+              </div>
+              {/* Odds explanation */}
+              <div style={{ padding: '10px 20px', borderBottom: '1px solid var(--border)', fontSize: 11, color: 'var(--muted)', background: 'var(--surface2)', lineHeight: 1.5 }}>
+                💡 These % figures represent the probability Polymarket traders assign based on real money wagered — e.g. 15% = traders think there&apos;s a 1-in-7 chance.
+              </div>
+              <div style={{ padding: '8px 0', maxHeight: 400, overflowY: 'auto' }}>
+                {(data.relatedMarkets || []).map((rm, i) => {
+                  const rmColor = rm.probability >= 60 ? '#1a6b4a' : rm.probability >= 40 ? '#92600a' : '#b03a2e';
+                  const rmLabel = rm.probability >= 70 ? 'Likely' : rm.probability >= 45 ? 'Toss-up' : rm.probability >= 20 ? 'Unlikely' : 'Very unlikely';
+                  return (
+                    <a key={i} href={`https://polymarket.com/event/${rm.slug}`} target="_blank" rel="noopener noreferrer"
+                      style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
+                      <div style={{ 
+                        padding: '12px 20px', 
+                        borderBottom: i < (data.relatedMarkets || []).length - 1 ? '1px solid var(--border)' : 'none',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        transition: 'background 0.12s'
+                      }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface2)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 2 }}>
+                            {rm.title} <span style={{ fontSize: 11, color: '#2563eb' }}>↗</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'Geist Mono, monospace' }}>
+                            Vol {rm.volume} · <span style={{ color: rmColor }}>{rmLabel}</span>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <div style={{ fontFamily: 'Geist Mono, monospace', fontSize: 15, fontWeight: 700, color: rmColor }}>{rm.probability}%</div>
+                          <div style={{ fontSize: 9, color: 'var(--muted)' }}>chance</div>
+                        </div>
+                      </div>
+                    </a>
+                  );
+                })}
               </div>
             </div>
           )}
