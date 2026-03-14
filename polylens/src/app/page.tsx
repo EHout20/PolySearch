@@ -59,7 +59,7 @@ export default function Home() {
   async function runDeepResearch() {
     if (!query.trim()) return;
     setLoadingDeep(true);
-    setDeepLog(['🔍 Launching browser agent...', `📡 Querying Polymarket odds for "${query}"...`]);
+    setDeepLog(['🔍 Analysing news sources...', `📡 Querying Polymarket odds for "${query}"...`]);
 
     try {
       // Simulate progress log while waiting
@@ -67,33 +67,41 @@ export default function Home() {
         setDeepLog(prev => {
           if (prev.length < 8) {
             const steps = [
-              '🌐 Searching Google News for relevant articles...',
-              '📰 Opening news sources...',
-              '🔎 Analyzing polymarket sentiment...',
+              '📰 Reading news articles...',
+              '🔎 Analysing market sentiment...',
               '📊 Cross-referencing with market data...',
-              '✓ Found relevant sources, compiling...',
-              '✦ Generating AI analysis...',
+              '✓ Sources verified, compiling...',
+              '✦ Generating AI report...',
             ];
             const next = steps[prev.length - 2];
             return next ? [...prev, next] : prev;
           }
           return prev;
         });
-      }, 3500);
+      }, 2500);
 
       const res = await fetch('/api/research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, deep: true })
+        body: JSON.stringify({
+          query,
+          deep: true,
+          // Send the news and market already on screen — Gemini writes from these
+          market: researchData?.market,
+          news: researchData?.news ?? [],
+        })
       });
       clearInterval(logTimer);
       const data = await res.json();
       setDeepLog(prev => [...prev, '✓ Deep research complete!']);
-      // Merge deep results into existing data (keep market from original)
+      // Merge: always keep the original news — never let it be replaced
+      const existingNews = researchData?.news ?? [];
       setResearchData(prev => ({
         ...prev,
         ...data,
         market: data.market || prev?.market,
+        // Prefer existing news (fast RSS) — only use returned news if we had none
+        news: existingNews.length > 0 ? existingNews : (data.news ?? []),
       }));
       if (data.relatedMarkets) setRelatedMarkets(data.relatedMarkets);
     } catch (e) {
@@ -102,6 +110,7 @@ export default function Home() {
       setLoadingDeep(false);
     }
   }
+
 
   return (
     <main className="app-container">

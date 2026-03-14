@@ -1,6 +1,4 @@
 import { NextResponse } from 'next/server';
-import { spawn } from 'child_process';
-import path from 'path';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function fmtDollars(n: any): string {
@@ -83,6 +81,109 @@ function extractGammaMarket(event: any) {
     isMulti: outcomes.length > 2,
     clobTokenIds
   };
+}
+
+// ── Gemini Deep Synthesis (uses pre-fetched news as source) ─────────────────
+async function getGeminiDeepSummary(
+  market: any,
+  query: string,
+  news: any[]
+): Promise<{ summary: string; report: string; factors: any[]; signals: any[]; sentiment: any }> {
+  let apiKey = process.env.GOOGLE_API_KEY;
+  if (!apiKey) {
+    try {
+      const fs = require('fs');
+      const p = require('path');
+      const envPath = p.join(process.cwd(), '.env');
+      if (fs.existsSync(envPath)) {
+        const envFile = fs.readFileSync(envPath, 'utf8');
+        const match = envFile.match(/^GOOGLE_API_KEY\s*=\s*(.+)$/m);
+        if (match) apiKey = match[1].trim();
+      }
+    } catch (_) {}
+  }
+
+  if (!apiKey) return {
+    summary: 'AI summary unavailable (no API key configured).',
+    report: '',
+    factors: [],
+    signals: [],
+    sentiment: { bull: 50, bear: 30, neutral: 20 }
+  };
+
+  const prob = market?.probability ?? 50;
+  const newsJson = JSON.stringify(news.slice(0, 8));
+
+  const prompt = `You are a clear, direct financial journalist. Your job is to explain what's happening with "${query}" in plain English that anyone can understand — no jargon, no buzzwords, no corporate speak.
+
+MARKET DATA:
+- Market: ${market?.title || query}
+- Current odds: ${prob}% chance of YES
+- Volume traded: ${market?.volume || 'N/A'} | Liquidity: ${market?.liquidity || 'N/A'}
+
+NEWS ARTICLES (use only these as your source — do not invent facts):
+${newsJson}
+
+TONE RULES:
+- Write like a smart friend texting you what's happening, not a formal report
+- Use short sentences. Get to the point fast.
+- No phrases like "intelligence briefing", "dossier", "aforementioned", "it is worth noting"
+- Use numbers and specifics where possible (e.g. "odds dropped from 60% to 45%", not "odds decreased significantly")
+
+Return ONLY this raw JSON (no markdown fences, no code blocks):
+{
+  "summary": "3 short punchy sentences: what's happening right now, what's driving it, and what to watch. Written like a text message from a smart friend.",
+  "report": "# What's going on\\n[2-3 sentences explaining the current situation in plain English]\\n\\n# Why the odds are here\\n[Explain what's pushing the probability up or down, using specific details from the news]\\n\\n# What could change this\\n[2-3 concrete things that could shift the market. Be specific.]\\n\\n# Bottom line\\n[One blunt sentence — is this likely to happen or not, and why?]",
+  "factors": [
+    {"direction": "up|down|neutral", "title": "Short factor name", "detail": "One plain-English sentence explaining why this matters."}
+  ],
+  "sentiment": {"bull": 50, "bear": 30, "neutral": 20},
+  "signals": [{"label": "Short signal label", "type": "warning|info|success"}]
+}
+
+CRITICAL: Every sentence in summary and report must be something a non-expert would immediately understand.`;
+
+  try {
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.6, maxOutputTokens: 2048 }
+        })
+      }
+    );
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error.message || 'Gemini API Error');
+
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const start = cleaned.indexOf('{');
+    const end = cleaned.lastIndexOf('}');
+    const jsonStr = start !== -1 && end !== -1 ? cleaned.substring(start, end + 1) : '{}';
+
+    let parsed: any = {};
+    try { if (jsonStr !== '{}') parsed = JSON.parse(jsonStr); } catch (_) {}
+
+    return {
+      summary: parsed.summary || text,
+      report: parsed.report || '',
+      factors: parsed.factors || [],
+      signals: parsed.signals || [],
+      sentiment: parsed.sentiment || { bull: 50, bear: 30, neutral: 20 }
+    };
+  } catch (e) {
+    console.error('Gemini deep error:', e);
+    return {
+      summary: 'AI analysis temporarily unavailable.',
+      report: '',
+      factors: [],
+      signals: [],
+      sentiment: { bull: 50, bear: 30, neutral: 20 }
+    };
+  }
 }
 
 // ── Gemini Summary ────────────────────────────────────────────────────────────
@@ -218,45 +319,26 @@ async function fetchGoogleNewsRss(query: string): Promise<any[]> {
 // ── Main Handler ─────────────────────────────────────────────────────────────
 export async function POST(req: Request) {
   try {
-    const { query, deep, ai = true } = await req.json();
+    const { query, deep, ai = true, market: incomingMarket, news: incomingNews } = await req.json();
     if (!query?.trim()) return NextResponse.json({ error: 'Missing query' }, { status: 400 });
 
     if (deep) {
-      // Deep: run the Python agent
-      const scriptPath = path.join(process.cwd(), 'backend', 'polymarket_agent.py');
-      let stdout = '', stderr = '';
-      const agentProcess = spawn('python3', [scriptPath, query, '--json', '--deep']);
-      agentProcess.stdout.on('data', (d) => { stdout += d.toString(); });
-      agentProcess.stderr.on('data', (d) => { stderr += d.toString(); });
-      const result: any = await new Promise((resolve, reject) => {
-        agentProcess.on('close', (code) => {
-          console.log(`Agent exited with code ${code}`);
-          if (code !== 0 && !stdout.includes('{')) {
-            console.error(`Agent Error (stderr): ${stderr}`);
-            reject(new Error(stderr || 'Agent failed'));
-          } else {
-            try { 
-              const startMarker = '---JSON_START---';
-              const endMarker = '---JSON_END---';
-              const startIdx = stdout.indexOf(startMarker);
-              const endIdx = stdout.lastIndexOf(endMarker);
+      // ── Deep Research: NO browser-use. Use the news already shown to the user.
+      // The frontend sends the existing market + news so Gemini can write the report
+      // from verified sources only. News is never re-fetched or overwritten.
+      const market = incomingMarket || { title: query, probability: 50 };
+      const news: any[] = Array.isArray(incomingNews) && incomingNews.length > 0
+        ? incomingNews
+        : [];
 
-              if (startIdx === -1 || endIdx === -1) {
-                console.error(`No markers in stdout. Raw: ${stdout}\nStderr: ${stderr}`);
-                throw new Error('No JSON found in output');
-              }
+      const analysis = await getGeminiDeepSummary(market, query, news);
 
-              const jsonStr = stdout.substring(startIdx + startMarker.length, endIdx);
-              resolve(JSON.parse(jsonStr)); 
-            }
-            catch (_) { 
-              console.error(`Parse failed. stdout: ${stdout}\nstderr: ${stderr}`);
-              reject(new Error('Failed to parse agent output. See server logs.')); 
-            }
-          }
-        });
+      return NextResponse.json({
+        market,
+        ...analysis,
+        // Always echo back the SAME news the user was already seeing
+        news,
       });
-      return NextResponse.json(result);
     }
 
     // Standard: fetch from Gamma API + Gemini

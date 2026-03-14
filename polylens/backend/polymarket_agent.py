@@ -257,65 +257,77 @@ CRITICAL: The url field MUST be the direct article URL (starting with https://),
         except:
             data = {"briefing": cleaned_json, "intel": "Data extraction failed", "news": []}
 
-        edu_text = data.get("briefing", "No briefing found.")
-        news_list = data.get("news", [])
-        scraped_intel = data.get("intel", "")
+        from typing import cast, Any
+        _data: dict[str, Any] = data if isinstance(data, dict) else {}
+        edu_text: str = str(_data.get("briefing", "No briefing found."))
+        news_list: list[dict] = list(_data.get("news", []))
+        scraped_intel: str = str(_data.get("intel", ""))
 
         # Determine probability for context
         prob = 50
         if isinstance(market, dict):
             prob = market.get('probability', 50)
 
-        # Final Synthesis
+        # ── OPTIMIZED SYNTHESIS ───────────────────────────────────────────────
+        # The browser already gave us real, fast news citations — pass them
+        # straight through. The LLM only needs to write the analysis (summary,
+        # report, factors) using those articles as its source, which is far
+        # faster than asking it to re-invent news it already has.
+        news_for_prompt = json.dumps(list(news_list)[:5])  # feed scraped articles in
         synthesize_prompt = f"""You are a Professional Market Analyst & Intelligence Officer.
-YOUR GOAL: Produce a high-stakes, comprehensive intelligence briefing for "{query}".
+YOUR GOAL: Write a concise but high-quality intelligence briefing for "{query}" using the research below.
 
-CONTEXTUAL INTEL:
+SOURCE BRIEFING:
 {edu_text}
 
-WEBSITE SCRAPED INTEL:
+SCRAPED INTEL:
 {scraped_intel}
 
-RECENT NEWS ARTICLES:
-{json.dumps(news_list)}
+VERIFIED NEWS ARTICLES (already sourced — do NOT fabricate new ones):
+{news_for_prompt}
 
 POLYMARKET COMMUNITY DISCUSSION:
 {comments_block}
 
-CURRENT MARKET ODDS (Probability): {prob}%
+CURRENT MARKET ODDS: {prob}%
 
-YOUR TASK:
-1. Write a "summary": 2-3 compelling paragraphs that synthesize the research into a coherent betting thesis.
-2. Write a "report": A professional-grade, structured intelligence dossier using Markdown headers.
-   - Use # for main sections and ## for sub-sections.
-   - SECTIONS REQUIRED:
-     # CURRENT STATUS
-     (Detail the standings, rankings, and major league/event storylines)
-     # PERSONNEL & INJURIES
-     (Provide a deep dive into key figures and their physical/mental status)
-     # COMMUNITY PULSE
-     (Analyze the community comments provided above. What is the sentiment? Are there contrarian views?)
-     # MARKET VERDICT
-     (Detailed analysis of why the odds are what they are and what shifts they may take)
-3. List 4 high-impact "factors" (bullet points).
-4. Return a "news" array with 5 real news items.
-
-CRITICAL: The "report" must be extremely detailed (at least 500 words). Use bolding and lists for readability.
-
-RETURN ONLY A RAW JSON OBJECT:
+YOUR TASK — return ONLY this raw JSON (no markdown fences):
 {{
-  "summary": "Full summary text...",
-  "report": "Full dossier text...",
-  "factors": [ ... ],
-  "news": [ ... ],
-  "sentiment": {{"bull": x, "bear": y, "neutral": z}},
-  "probabilityLabel": "Market Label",
-  "signals": [{{ "label": "Label", "type": "warning|info|success" }}]
-}}"""
-        
+  "summary": "2-3 paragraph betting thesis synthesising all the above.",
+  "report": "Structured intelligence dossier with Markdown headers:\\n# CURRENT STATUS\\n...\\n# COMMUNITY PULSE\\n...\\n# MARKET VERDICT\\n...",
+  "factors": [
+    {{"direction": "up|down|neutral", "title": "...", "detail": "..."}}
+  ],
+  "sentiment": {{"bull": 50, "bear": 30, "neutral": 20}},
+  "probabilityLabel": "Short market verdict label",
+  "signals": [{{"label": "...", "type": "warning|info|success"}}]
+}}
+
+CRITICAL: The "report" field must be thorough (300+ words). Use bolding and bullet lists."""
+
         final_response = await llm.ainvoke(synthesize_prompt)
-        # Ensure the response is returned as a string (it's already a JSON string from the LLM usually)
-        return getattr(final_response, 'content', str(final_response))
+        raw_analysis = getattr(final_response, 'content', str(final_response))
+
+        # ── Merge: inject the real scraped news into the LLM's analysis ──────
+        analysis: dict[str, Any]
+        try:
+            parsed = json.loads(
+                raw_analysis.replace("```json", "").replace("```", "").strip()
+            )
+            analysis = parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            analysis = {
+                "summary": raw_analysis,
+                "report": "Report parsing failed — see summary.",
+                "factors": [],
+                "sentiment": {"bull": 50, "bear": 30, "neutral": 20},
+                "probabilityLabel": "Analysis Available",
+                "signals": []
+            }
+
+        # Always use the browser's real citations — never the LLM's guesses
+        analysis["news"] = news_list
+        return json.dumps(analysis)
             
     except Exception as e:
         # Generate a high-quality fallback
