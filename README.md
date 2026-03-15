@@ -6,8 +6,6 @@ PolyLens is an AI-powered intelligence platform designed to decode prediction ma
 
 ## Demo
 
-[![PolyLens Demo](https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg)](https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1)
-
 <video src="https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1" controls></video>
 
 ---
