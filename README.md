@@ -2,13 +2,11 @@
 
 PolyLens is an AI-powered intelligence platform designed to decode prediction markets. It bridges the gap between raw Polymarket odds and real-world context using high-speed research agents and LLM-driven synthesis.
 
-![PolyLens Banner](https://images.unsplash.com/photo-1611974714851-48206138d731?q=80&w=2000&auto=format&fit=crop)
-
 ---
 
 ## Demo
 
-<video src="YOUR_GITHUB_VIDEO_URL_HERE" controls width="100%"></video>
+<video src"https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1" controls width="100%"></video>
 
 ---
 
