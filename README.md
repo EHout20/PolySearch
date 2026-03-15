@@ -2,11 +2,13 @@
 
 PolyLens is an AI-powered intelligence platform designed to decode prediction markets. It bridges the gap between raw Polymarket odds and real-world context using high-speed research agents and LLM-driven synthesis.
 
+![PolyLens Banner](https://images.unsplash.com/photo-1611974714851-48206138d731?q=80&w=2000&auto=format&fit=crop)
+
 ---
 
 ## Demo
 
-<video src="https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1" controls></video>
+<video src="YOUR_GITHUB_VIDEO_URL_HERE" controls width="100%"></video>
 
 ---
 
@@ -36,7 +38,6 @@ PolyLens is built for speed and precision, using a modern hybrid architecture:
 ---
 
 ## Project Structure
-
 ```text
 PolySearch/
 ├── polylens/               # Main Next.js Web Application
@@ -63,19 +64,18 @@ PolySearch/
 1. Clone the repo.
 2. Create `polylens/.env` (use `.env.example` as a template).
 3. Install frontend dependencies:
-   ```bash
+```bash
    cd polylens
    npm install
-   ```
+```
 4. (Optional) Install Python agent dependencies:
-   ```bash
+```bash
    cd polylens/backend
    pip install langchain-google-genai browser-use playwright
    playwright install chromium
-   ```
+```
 
 ### 3. Running the App
-
 ```bash
 cd polylens
 npm run dev
@@ -100,7 +100,6 @@ Clicking **"Generate Analysis"** triggers a deep synthesis. Gemini parses the id
 ## Advanced: Standalone Agent
 
 For heavy-duty research without the UI, you can run the Python agent directly:
-
 ```bash
 python3 polylens/backend/polymarket_agent.py "Who will win the 2026 NBA Finals?" --json
 ```
